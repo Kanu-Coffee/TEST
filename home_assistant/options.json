@@ -1,0 +1,29 @@
+{
+  "options": {
+    "symbol_ticker": "USDT_KRW",
+    "order_currency": "USDT",
+    "payment_currency": "KRW",
+    "hf_mode": true,
+    "dry_run": true,
+    "report_interval_minutes": 60,
+    "report_serve": true,
+    "mqtt_enabled": false,
+    "mqtt_host": "127.0.0.1",
+    "mqtt_port": 1883,
+    "mqtt_base_topic": "bithumb_bot"
+  },
+  "schema": {
+    "symbol_ticker": "str",
+    "order_currency": "str",
+    "payment_currency": "str",
+    "hf_mode": "bool",
+    "dry_run": "bool",
+    "report_interval_minutes": "int",
+    "report_serve": "bool",
+    "mqtt_enabled": "bool",
+    "mqtt_host": "str",
+    "mqtt_port": "int",
+    "mqtt_base_topic": "str"
+  },
+  "description": "Map Home Assistant add-on UI fields to bot_config.yaml keys."
+}
