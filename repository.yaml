@@ -1,3 +1,6 @@
-name: Bithumb & KIS Trading Bot Add-on Repo
+name: Kanu Coffee Add-ons
 url: https://github.com/Kanu-Coffee/TEST
 maintainer: Kanu Coffee
+addons:
+  bithumb_kis_bot:
+    repository: ha-addon
