@@ -51,6 +51,8 @@ KIS_CURRENCY=${KIS_CURRENCY:-USD}
 KIS_ORDER_LOT_SIZE=${KIS_ORDER_LOT_SIZE:-1.0}
 GATEWAY_PORT=${GATEWAY_PORT:-6443}
 
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PATH:-}"
+
 bashio::log.info "Preparing trading bot workspace"
 
 if [ -d "/opt/bot/.git" ]; then
@@ -71,8 +73,6 @@ if [[ -z "${PYTHON_BIN}" ]]; then
     exit 1
 fi
 
-PIP_CMD=("${PYTHON_BIN}" -m pip)
-
 if [ -f /opt/bot/requirements.txt ]; then
     bashio::log.info "Installing Python dependencies"
     if "${PYTHON_BIN}" -m ensurepip --help >/dev/null 2>&1; then
@@ -89,15 +89,27 @@ ensurepip.bootstrap(upgrade=True)
 PY
     fi
 
-    if ! "${PYTHON_BIN}" -m pip --version >/dev/null 2>&1; then
-        if command -v pip3 >/dev/null 2>&1; then
-            ln -sf "$(command -v pip3)" /usr/bin/pip
-        fi
+    PIP_CMD=()
+    if "${PYTHON_BIN}" -m pip --version >/dev/null 2>&1; then
+        PIP_CMD=("${PYTHON_BIN}" -m pip)
+    else
+        for candidate in pip pip3; do
+            if command -v "${candidate}" >/dev/null 2>&1; then
+                PIP_CMD=("${candidate}")
+                break
+            fi
+        done
     fi
 
-    if ! "${PYTHON_BIN}" -m pip --version >/dev/null 2>&1; then
-        bashio::log.fatal "pip module is not available even after bootstrapping"
+    if [ ${#PIP_CMD[@]} -eq 0 ]; then
+        bashio::log.fatal "pip executable is not available even after bootstrapping"
         exit 1
+    fi
+
+    if [[ "${PIP_CMD[0]}" != "${PYTHON_BIN}" ]]; then
+        bashio::log.warning "Using fallback pip executable: ${PIP_CMD[*]}"
+    else
+        bashio::log.info "Using Python module invocation for pip"
     fi
 
     if ! command -v pip >/dev/null 2>&1 && command -v pip3 >/dev/null 2>&1; then
