@@ -1,4 +1,7 @@
 #!/command/with-contenv bashio
+# Pre-patch for HAOS pip path issue
+ln -sf /usr/bin/pip3 /usr/bin/pip 2>/dev/null || true
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PATH:-}"
 set -euo pipefail
 
 REPO_URL="$(bashio::config 'repository_url')"
