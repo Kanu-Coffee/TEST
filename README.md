@@ -205,17 +205,20 @@ These files power the HTML report generated via `tools/generate_report.py`.
 
 2. **애드온 설치** – `Bithumb/KIS Trading Bot`을 선택해 설치합니다. 이 애드온은 저장소 루트의 `repository.yaml`과 `ha-addon/` 폴더(`config.yaml`, `Dockerfile`, `rootfs/`)를 사용합니다.
 
-3. **옵션 설정** – 설치 후 “구성(Configure)” 화면에서 다음 항목을 입력합니다.
+3. **옵션 설정** – 설치 후 “구성(Configure)” 화면에 필드별 안내가 한글·영문으로 표시됩니다. 아래 표를 참고해 필수 항목부터 채우세요.
 
-   | 항목 | 설명 |
-   | --- | --- |
-   | `repository_url` | 실행할 코드가 있는 Git 저장소 (기본값은 현재 프로젝트) |
-   | `repository_ref` | 체크아웃할 브랜치 또는 태그 (`main` 등) |
-   | `exchange` | 사용할 거래소 (`BITHUMB` 또는 `KIS`) |
-   | `env_vars` | `.env`에 추가할 `KEY=VALUE` 목록 (예: `BITHUMB_API_KEY=abc123`) |
-   | `enable_gateway` | `true`이면 내장 FastAPI 게이트웨이를 8080 포트에서 실행 |
+   | 구분 | 필수 값 | 설명 |
+   | --- | --- | --- |
+   | 기본 | `repository_url`, `repository_ref`, `exchange` | 어떤 저장소/브랜치의 코드를 실행할지와 대상 거래소를 정합니다. |
+   | 공통 | `bot_symbol_ticker`, `bot_order_currency`, `bot_payment_currency` | 기본 종목·주문/정산 통화를 지정합니다. 기본값은 빗썸 USDT/KRW 세팅입니다. |
+   | 실행 모드 | `bot_dry_run`, `bot_hf_mode` | 드라이런(연습) 모드를 켜 둔 상태에서 먼저 테스트한 뒤 실거래 시 `bot_dry_run`을 꺼주세요. |
+   | 전략 | `default_*`, `hf_*` 필드 | 기본/고빈도 그리드의 첫 주문 금액, 간격, 마틴배율, 최대 스텝을 조정합니다. (소수 표기: 0.005 = 0.5%) |
+   | 빗썸 선택 시 | `bithumb_api_key`, `bithumb_api_secret` | 실거래하려면 빗썸 API Key/Secret을 반드시 입력하세요. 드라이런 중 비워두면 경고만 출력됩니다. |
+   | KIS 선택 시 | `kis_app_key`, `kis_app_secret`, `kis_account_no`, `kis_account_password` | 한국투자증권 OpenAPI 주문에 필요한 기본 인증 값입니다. `kis_mode`로 모의/실전을 선택하세요. |
+   | 선택 | `env_vars` | 추가로 넣고 싶은 환경변수가 있으면 `KEY=VALUE` 형식으로 한 줄씩 입력합니다. |
+   | 게이트웨이 | `enable_gateway` | 리포트/설정/메트릭을 8080 포트로 노출하려면 `true`로 변경합니다. |
 
-   값을 저장하면 컨테이너가 `/data/bot/.env` 파일을 생성해 거래소별 설정을 기록합니다.
+   저장 후 컨테이너는 `/data/bot/.env`를 생성해 위 값들을 모두 반영합니다. 실거래 전에는 `bot_dry_run=true` 상태에서 로그와 리포트를 먼저 확인하세요.
 
 4. **애드온 시작** – “시작(Start)” 버튼을 누르면 컨테이너가 자동으로 아래 작업을 수행합니다.
 
