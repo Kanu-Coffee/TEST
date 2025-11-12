@@ -65,8 +65,9 @@ git -C /opt/bot submodule update --init --recursive
 
 if [ -f /opt/bot/requirements.txt ]; then
     bashio::log.info "Installing Python dependencies"
-    pip install --upgrade pip >/dev/null
-    pip install -r /opt/bot/requirements.txt
+    python3 -m ensurepip --upgrade >/dev/null 2>&1 || true
+    python3 -m pip install --upgrade pip >/dev/null
+    python3 -m pip install -r /opt/bot/requirements.txt
 fi
 
 if bashio::var.true "${DRY_RUN}"; then
