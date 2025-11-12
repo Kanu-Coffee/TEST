@@ -3,4 +3,4 @@ url: https://github.com/Kanu-Coffee/TEST
 maintainer: Kanu Coffee
 addons:
   bithumb_kis_bot:
-    target: ha-addon
+    repository: ha-addon
