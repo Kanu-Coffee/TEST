@@ -203,7 +203,7 @@ These files power the HTML report generated via `tools/generate_report.py`.
 
    이제 “Bithumb/KIS Trading Bot” 애드온이 목록에 나타납니다.
 
-2. **애드온 설치** – `Bithumb/KIS Trading Bot`을 선택해 설치합니다. 이 애드온은 `home_assistant/bithumb_kis_bot/` 폴더의 `config.json`과 `Dockerfile`을 사용합니다.
+2. **애드온 설치** – `Bithumb/KIS Trading Bot`을 선택해 설치합니다. 이 애드온은 저장소 루트의 `repository.yaml`과 `ha-addon/` 폴더(`config.yaml`, `Dockerfile`, `rootfs/`)를 사용합니다.
 
 3. **옵션 설정** – 설치 후 “구성(Configure)” 화면에서 다음 항목을 입력합니다.
 
@@ -236,8 +236,8 @@ These files power the HTML report generated via `tools/generate_report.py`.
   - edit `config/bot_config.yaml` through a simple web form (ingress friendly).
 - The bot continuously writes a metrics snapshot to `data/ha_metrics.json`. MQTT publishing mirrors the same data to
   `<base_topic>/<metric>` topics when `home_assistant.mqtt.enabled` is true (default base topic: `bithumb_bot`).
-- The full custom add-on is defined in `home_assistant/bithumb_kis_bot/`. `home_assistant/options.json` remains as a mapping
-  example if you need to translate between Supervisor UI fields and the YAML/ENV keys.
+- The full custom add-on is defined in `ha-addon/`, and the Supervisor metadata lives
+  at the repository root (`repository.yaml`).
 - Generated reports default to `reports/latest.html`; change `home_assistant.reporting.output_path` in YAML if you mount a
   different volume inside a container.
 
