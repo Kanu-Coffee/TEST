@@ -193,14 +193,51 @@ These files power the HTML report generated via `tools/generate_report.py`.
 
 ## Home Assistant integration
 
+### Custom add-on repository (전체 과정을 따라 하세요)
+
+1. **애드온 저장소 추가** – Home Assistant 웹 UI에서 *설정 → 애드온 → 애드온 스토어*로 이동한 뒤 오른쪽 상단 메뉴에서 “저장소”를 선택하고 아래 주소를 붙여넣습니다.
+
+   ```text
+   https://github.com/Kanu-Coffee/TEST
+   ```
+
+   이제 “Bithumb/KIS Trading Bot” 애드온이 목록에 나타납니다.
+
+2. **애드온 설치** – `Bithumb/KIS Trading Bot`을 선택해 설치합니다. 이 애드온은 `home_assistant/bithumb_kis_bot/` 폴더의 `config.json`과 `Dockerfile`을 사용합니다.
+
+3. **옵션 설정** – 설치 후 “구성(Configure)” 화면에서 다음 항목을 입력합니다.
+
+   | 항목 | 설명 |
+   | --- | --- |
+   | `repository_url` | 실행할 코드가 있는 Git 저장소 (기본값은 현재 프로젝트) |
+   | `repository_ref` | 체크아웃할 브랜치 또는 태그 (`main` 등) |
+   | `exchange` | 사용할 거래소 (`BITHUMB` 또는 `KIS`) |
+   | `env_vars` | `.env`에 추가할 `KEY=VALUE` 목록 (예: `BITHUMB_API_KEY=abc123`) |
+   | `enable_gateway` | `true`이면 내장 FastAPI 게이트웨이를 8080 포트에서 실행 |
+
+   값을 저장하면 컨테이너가 `/data/bot/.env` 파일을 생성해 거래소별 설정을 기록합니다.
+
+4. **애드온 시작** – “시작(Start)” 버튼을 누르면 컨테이너가 자동으로 아래 작업을 수행합니다.
+
+   - `repository_url`과 `repository_ref`를 기준으로 코드를 `/opt/bot`에 클론하거나 업데이트합니다.
+   - `requirements.txt`를 읽어 필요한 패키지를 설치합니다.
+   - `/data/bot/.env`에 기록된 환경변수를 로드하고 `python -m bot.bithumb_bot`을 실행합니다.
+   - `enable_gateway`가 `true`이면 `python -m tools.ha_gateway --host 0.0.0.0 --port 8080`을 함께 띄웁니다.
+
+5. **리포트와 상태 확인** – 애드온 로그에서 봇 실행 상황을 확인하고, 게이트웨이를 켰다면 `http://homeassistant.local:8080/report`(또는 ingress)에서 HTML 리포트를 볼 수 있습니다. `/metrics`는 Home Assistant 센서 자동화에 활용할 수 있는 JSON 데이터를 제공합니다.
+
+> 💡 **팁:** 애드온은 `/data`를 지속 저장소로 사용합니다. 필요 시 SSH 애드온이나 Samba를 통해 `config/bot_config.yaml`이나 CSV 로그를 직접 열어볼 수 있습니다.
+
+### 직접 실행형 연동
+
 - Run `uvicorn tools.ha_gateway:app --host 0.0.0.0 --port 8080` alongside the bot to:
   - auto-refresh the latest HTML report based on `home_assistant.reporting.interval_minutes`;
   - expose `/metrics`, `/generate-report`, `/report`, and `/config` endpoints for dashboards or automations;
   - edit `config/bot_config.yaml` through a simple web form (ingress friendly).
 - The bot continuously writes a metrics snapshot to `data/ha_metrics.json`. MQTT publishing mirrors the same data to
   `<base_topic>/<metric>` topics when `home_assistant.mqtt.enabled` is true (default base topic: `bithumb_bot`).
-- Use the template in `home_assistant/options.json` when wiring the project into a Home Assistant add-on. It maps the most
-  common settings to Supervisor UI fields.
+- The full custom add-on is defined in `home_assistant/bithumb_kis_bot/`. `home_assistant/options.json` remains as a mapping
+  example if you need to translate between Supervisor UI fields and the YAML/ENV keys.
 - Generated reports default to `reports/latest.html`; change `home_assistant.reporting.output_path` in YAML if you mount a
   different volume inside a container.
 
