@@ -3,41 +3,59 @@
 # All numeric values accept floats unless noted otherwise.
 
 bot:
-  # 기본 거래 설정
-  symbol_ticker: USDT_KRW          # 예: USDT_KRW, BTC_KRW
-  order_currency: USDT             # 매수 자산
-  payment_currency: KRW            # 결제 통화
-  hf_mode: true                    # 고빈도(HF) 전략 사용 여부
-  dry_run: true                    # True면 모의모드
+  # Global runtime switches
+  exchange: BITHUMB              # BITHUMB (default) or KIS
+  symbol_ticker: USDT_KRW        # 예: USDT_KRW, BTC_KRW, TQQQ
+  order_currency: USDT           # Bithumb에서 매수할 자산
+  payment_currency: KRW          # 결제 통화
+  hf_mode: true                  # 고빈도(HF) 전략 사용 여부
+  dry_run: true                  # true이면 모의모드
+
+bithumb:
+  api_key: ""
+  api_secret: ""
+  base_url: https://api.bithumb.com
+  auth_mode: legacy              # legacy | jwt
+
+kis:
+  app_key: ""
+  app_secret: ""
+  account_no: ""                # 12345678-01 형식
+  account_password: ""          # 선택 입력
+  mode: paper                    # paper | live
+  exchange_code: NASD            # 거래소 코드 (예: NASD, NYSE)
+  symbol: TQQQ                   # 종목 코드 (예: TQQQ)
+  currency: USD                  # 정산 통화
+  order_lot_size: 1.0            # 최소 주문 주식 수 (1주 단위)
 
 strategy:
   # 일반 모드 파라미터
   default:
-    buy_step: 0.008                # 매수 간격 (0.8%)
-    martingale_mul: 1.5            # 마팅게일 배수
-    max_steps: 10                  # 최대 매수 스텝 수
-    base_krw: 5000                 # 첫 매수금액 (KRW)
-    vol_halflife: 60               # 변동성 EWMA 하프라이프(초)
-    vol_min: 0.001                 # 최소 변동성
-    vol_max: 0.015                 # 최대 변동성
-    tp_k: 0.55                     # 목표가 배율
-    sl_k: 1.25                     # 손절가 배율
-    tp_floor: 0.003                # 최소 목표 수익률
-    sl_floor: 0.007                # 최소 손절 수익률
-    sleep_sec: 2.0                 # 루프 주기 (초)
-    order_cooldown: 6              # 주문 쿨다운 (초)
-    max_orders_min: 6              # 분당 최대 주문 횟수
-    cancel_base_wait: 10.0         # 주문 취소 기본 대기시간 (초)
-    cancel_min_wait: 5.0           # 최소 취소 대기시간 (초)
-    cancel_max_wait: 30.0          # 최대 취소 대기시간 (초)
-    cancel_vol_scale: 2000.0       # 거래량 변화 대비 취소 스케일
+    buy_step: 0.008              # 매수 간격 (0.8%)
+    martingale_mul: 1.5          # 마팅게일 배수
+    max_steps: 10                # 최대 매수 스텝 수
+    base_order_value: 5000       # 첫 매수 금액 (KRW 또는 USD 등)
+    vol_halflife: 60             # 변동성 EWMA 하프라이프(초)
+    vol_min: 0.001               # 최소 변동성
+    vol_max: 0.015               # 최대 변동성
+    tp_k: 0.55                   # 목표가 배율
+    sl_k: 1.25                   # 손절가 배율
+    tp_floor: 0.003              # 최소 목표 수익률
+    sl_floor: 0.007              # 최소 손절 수익률
+    sleep_sec: 2.0               # 루프 주기 (초)
+    order_cooldown: 6            # 주문 쿨다운 (초)
+    max_orders_min: 6            # 분당 최대 주문 횟수
+    cancel_base_wait: 10.0       # 주문 취소 기본 대기시간 (초)
+    cancel_min_wait: 5.0         # 최소 취소 대기시간 (초)
+    cancel_max_wait: 30.0        # 최대 취소 대기시간 (초)
+    cancel_vol_scale: 2000.0     # 거래량 변화 대비 취소 스케일
 
   # HF 모드 파라미터 (hf_mode=true일 때 적용)
   hf:
     buy_step: 0.005
     martingale_mul: 1.3
     max_steps: 10
-    base_krw: 5000
+    base_order_value: 5000
     vol_halflife: 30
     vol_min: 0.0045
     vol_max: 0.015
@@ -54,26 +72,26 @@ strategy:
     cancel_vol_scale: 2000.0
 
 home_assistant:
-  metrics_file: ha_metrics.json     # 실시간 지표 저장 파일 (data/에 생성)
+  metrics_file: ha_metrics.json   # 실시간 지표 저장 파일 (data/에 생성)
 
   mqtt:
-    enabled: false                  # MQTT 브로커로 지표 전송
+    enabled: false                # MQTT 브로커로 지표 전송
     host: 127.0.0.1
     port: 1883
     username: ""
     password: ""
-    base_topic: bithumb_bot         # 예: bithumb_bot/pnl
+    base_topic: bithumb_bot       # 예: bithumb_bot/pnl
 
   reporting:
-    auto_generate: true             # 리포트 자동 생성 여부
-    interval_minutes: 60            # 리포트 갱신 주기 (분)
-    serve_report: true              # HTTP로 리포트 제공 여부
-    host: 0.0.0.0                   # FastAPI 바인드 주소
-    port: 8080                      # FastAPI 포트
-    ingress_path: /bithumb-bot      # HA ingress 경로 (옵션)
-    output_path: reports/latest.html# 리포트 저장 경로
+    auto_generate: true           # 리포트 자동 생성 여부
+    interval_minutes: 60          # 리포트 갱신 주기 (분)
+    serve_report: true            # HTTP로 리포트 제공 여부
+    host: 0.0.0.0                 # FastAPI 바인드 주소
+    port: 8080                    # FastAPI 포트
+    ingress_path: /bot-dashboard  # HA ingress 경로 (옵션)
+    output_path: reports/latest.html
 
   rest_api:
-    enabled: true                   # /metrics JSON 엔드포인트 제공 여부
+    enabled: true                 # /metrics JSON 엔드포인트 제공 여부
     host: 0.0.0.0
-    port: 8080                      # reporting.port와 동일 포트를 권장
+    port: 8080                    # reporting.port와 동일 포트를 권장

@@ -1,17 +1,25 @@
-# Bithumb Split-Buy Bot Toolkit
+# Split-Buy Bot Toolkit
 
-This repository contains a high-frequency split-buy trading bot tailored for the
-Bithumb USDT/KRW market. It also provides tooling for analysing historical
-trades and for managing configuration via environment variables.
+This repository contains a high-frequency split-buy trading bot that now works
+with multiple exchanges. The default setup targets the Bithumb USDT/KRW market,
+while an optional adapter supports overseas equities via the Korea Investment &
+Securities (KIS) OpenAPI. The toolkit also ships with analytics and
+configuration helpers for long-running Home Assistant deployments.
 
 ## Features
 
+- Multi-exchange core with adapters for Bithumb spot trading and KIS overseas
+  equities (shares handled in whole-lot increments).
 - High-frequency trading loop that adapts to market volatility using EWMA.
-- CSV logging for fills, errors, and daily summaries in the `data/` directory.
+- CSV logging for fills, errors, and daily summaries in the `data/` directory
+  (one set of files per exchange).
 - Interactive HTML report generator powered by Chart.js (now scheduled and shareable).
-- CLI helper to create or update either the `.env` file or a structured `config/bot_config.yaml`.
-- FastAPI-based gateway that serves the latest HTML report, exposes a config web UI, and streams metrics for Home Assistant.
-- Optional MQTT publisher and JSON metrics file (`data/ha_metrics.json`) for dashboards and automations.
+- CLI helper to create or update either the `.env` file or a structured
+  `config/bot_config.yaml`.
+- FastAPI-based gateway that serves the latest HTML report, exposes a config
+  web UI, and streams metrics for Home Assistant.
+- Optional MQTT publisher and JSON metrics file (`data/ha_metrics.json`) for
+  dashboards and automations.
 
 ## Getting started (English)
 
@@ -29,9 +37,13 @@ trades and for managing configuration via environment variables.
    python tools/configure_bot.py
    ```
 
+   - Choose the exchange (`BITHUMB` or `KIS`) when prompted and provide the
+     corresponding credentials.
    - Use `--set KEY=VALUE` pairs for non-interactive updates.
-   - To generate a YAML config with Home Assistant options, run `python tools/configure_bot.py --yaml` or copy
-     `config/bot_config.example.yaml` to `config/bot_config.yaml` and edit it manually.
+   - To generate a YAML config with Home Assistant options, run
+     `python tools/configure_bot.py --yaml` or copy
+     `config/bot_config.example.yaml` to `config/bot_config.yaml` and edit it
+     manually.
 4. Run the bot (defaults to dry-run mode until disabled in the `.env` file):
 
    ```bash
@@ -44,7 +56,7 @@ trades and for managing configuration via environment variables.
    python tools/generate_report.py
    ```
 
-   The default output lives in `reports/bithumb_report.html`.
+   The default output lives in `reports/latest.html`.
 
 6. (Optional) Launch the Home Assistant gateway to auto-refresh reports and expose metrics:
 
@@ -92,6 +104,8 @@ trades and for managing configuration via environment variables.
    python tools/configure_bot.py
    ```
 
+   - 첫 번째 질문에서 거래소(`BITHUMB` 또는 `KIS`)를 선택하고 해당 키를
+     입력합니다.
    - 명령형으로 바로 넣고 싶다면 `python tools/configure_bot.py --set BOT_DRY_RUN=true` 처럼 사용합니다.
    - 홈어시스턴트 옵션까지 포함한 YAML 설정이 필요하면 `python tools/configure_bot.py --yaml`을 실행하거나
      `config/bot_config.example.yaml`을 복사해 `config/bot_config.yaml`으로 저장한 뒤 수정하세요.
@@ -107,9 +121,9 @@ trades and for managing configuration via environment variables.
 
 6. **CSV 확인**  
    실행 후 `data/` 폴더에 CSV와 로그가 자동으로 쌓입니다.
-   - `bithumb_trades.csv`: 매수·매도 내역
-   - `bithumb_daily_summary.csv`: 일별 실현손익
-   - `bithumb_errors.log`: 에러 메모
+   - `<exchange>_trades.csv`: 매수·매도 내역 (예: `bithumb_trades.csv`)
+   - `<exchange>_daily_summary.csv`: 일별 실현손익
+   - `<exchange>_errors.log`: 에러 메모
 
 7. **리포트 HTML 만들기**
 
@@ -117,7 +131,7 @@ trades and for managing configuration via environment variables.
    python tools/generate_report.py
    ```
 
-   실행이 끝나면 `reports/bithumb_report.html`이 생성됩니다. 브라우저로 열면 그래프를 볼 수 있습니다.
+   실행이 끝나면 `reports/latest.html`이 생성됩니다. 브라우저로 열면 그래프를 볼 수 있습니다.
 
 8. **문제가 생기면**
    - `data/bithumb_errors.log`를 확인해 원인을 찾습니다.
@@ -142,14 +156,19 @@ original script.
 
 | Variable | Description |
 | --- | --- |
-| `BITHUMB_API_KEY` / `BITHUMB_API_SECRET` | API credentials. |
-| `BITHUMB_BASE_URL` | Bithumb REST API base URL. |
-| `BITHUMB_AUTH_MODE` | `legacy` (default) or `jwt`. |
-| `BOT_SYMBOL_TICKER` | Market ticker, e.g. `USDT_KRW`. |
-| `BOT_ORDER_CURRENCY` / `BOT_PAYMENT_CURRENCY` | Trading pair symbols. |
-| `BOT_HF_MODE` | Toggle high-frequency parameter set. |
-| `BOT_DRY_RUN` | Keep orders local for testing. |
-| `DEFAULT_*` / `HF_*` | Override strategy parameters (buy steps, TP/SL, etc.). |
+| `EXCHANGE` | Which adapter to use: `BITHUMB` or `KIS`. |
+| `BITHUMB_API_KEY` / `BITHUMB_API_SECRET` | Bithumb credentials. |
+| `BITHUMB_BASE_URL` / `BITHUMB_AUTH_MODE` | Advanced Bithumb settings. |
+| `KIS_APP_KEY` / `KIS_APP_SECRET` | KIS OpenAPI credentials. |
+| `KIS_ACCOUNT_NO` / `KIS_ACCOUNT_PASSWORD` | KIS account routing information. |
+| `KIS_MODE` | `paper` (default) or `live`. |
+| `KIS_SYMBOL` / `KIS_EXCHANGE_CODE` / `KIS_CURRENCY` | Overseas stock routing fields. |
+| `KIS_ORDER_LOT_SIZE` | Minimum share lot (usually `1`). |
+| `BOT_SYMBOL_TICKER` | Market ticker (Bithumb pair or reference symbol). |
+| `BOT_ORDER_CURRENCY` / `BOT_PAYMENT_CURRENCY` | Used for Bithumb pairs. |
+| `BOT_HF_MODE` / `BOT_DRY_RUN` | Toggle HF parameters and dry-run mode. |
+| `DEFAULT_BASE_ORDER_VALUE` / `HF_BASE_ORDER_VALUE` | Base order sizing per mode (legacy `*_BASE_KRW` still works). |
+| Other `DEFAULT_*` / `HF_*` | Override TP/SL, step size, cooldowns, etc. |
 
 Any value left blank in `.env` falls back to the defaults baked into
 `bot/config.py`.
@@ -164,11 +183,11 @@ pip install -r requirements.txt
 
 ## Data outputs
 
-- `data/bithumb_trades.csv` – detailed log of individual trades and order
-  attempts.
-- `data/bithumb_daily_summary.csv` – aggregated daily performance statistics
+- `data/<exchange>_trades.csv` – detailed log of individual trades and order
+  attempts (e.g. `data/bithumb_trades.csv` or `data/kis_trades.csv`).
+- `data/<exchange>_daily_summary.csv` – aggregated daily performance statistics
   automatically updated on each filled sell order.
-- `data/bithumb_errors.log` – diagnostic information for unexpected errors.
+- `data/<exchange>_errors.log` – diagnostic information for unexpected errors.
 
 These files power the HTML report generated via `tools/generate_report.py`.
 

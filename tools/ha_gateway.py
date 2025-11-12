@@ -92,7 +92,7 @@ async def _reload_state() -> None:
     app.state.metrics_path = _metrics_path(app.state.config)
     app.state.report_path = _report_path(app.state.config)
     if not app.state.report_path.exists():
-        generate_report(app.state.report_path)
+        generate_report(app.state.report_path, config=app.state.config)
     await _stop_report_task()
     ha = app.state.config.home_assistant
     if ha.reporting.auto_generate:
@@ -115,7 +115,7 @@ async def metrics() -> Dict[str, Any]:
 
 @app.post("/generate-report")
 async def trigger_report() -> Dict[str, Any]:
-    return generate_report(app.state.report_path)
+    return generate_report(app.state.report_path, config=app.state.config)
 
 
 @app.get("/report")
@@ -130,6 +130,8 @@ async def report() -> FileResponse:
 
 def _build_form(config: Dict[str, Any]) -> str:
     bot = config.get("bot", {})
+    bithumb_cfg = config.get("bithumb", {})
+    kis_cfg = config.get("kis", {})
     ha = config.get("home_assistant", {})
     mqtt = ha.get("mqtt", {})
     reporting = ha.get("reporting", {})
@@ -173,6 +175,9 @@ def _build_form(config: Dict[str, Any]) -> str:
             <fieldset>
                 <legend>Bot</legend>
                 <div class="row">
+                    <label>Exchange
+                        <input type="text" name="bot.exchange" value="{bot.get('exchange', 'BITHUMB')}" />
+                    </label>
                     <label>Symbol ticker
                         <input type="text" name="bot.symbol_ticker" value="{bot.get('symbol_ticker', '')}" />
                     </label>
@@ -189,6 +194,61 @@ def _build_form(config: Dict[str, Any]) -> str:
                     </label>
                     <label>Dry run
                         <input type="checkbox" name="bot.dry_run" value="true" {_checked(bot.get('dry_run', True))} />
+                    </label>
+                </div>
+            </fieldset>
+            <fieldset>
+                <legend>Bithumb</legend>
+                <div class="row">
+                    <label>API key
+                        <input type="text" name="bithumb.api_key" value="{bithumb_cfg.get('api_key', '')}" />
+                    </label>
+                    <label>API secret
+                        <input type="text" name="bithumb.api_secret" value="{bithumb_cfg.get('api_secret', '')}" />
+                    </label>
+                </div>
+                <div class="row">
+                    <label>Base URL
+                        <input type="text" name="bithumb.base_url" value="{bithumb_cfg.get('base_url', 'https://api.bithumb.com')}" />
+                    </label>
+                    <label>Auth mode
+                        <input type="text" name="bithumb.auth_mode" value="{bithumb_cfg.get('auth_mode', 'legacy')}" />
+                    </label>
+                </div>
+            </fieldset>
+            <fieldset>
+                <legend>KIS OpenAPI</legend>
+                <div class="row">
+                    <label>App key
+                        <input type="text" name="kis.app_key" value="{kis_cfg.get('app_key', '')}" />
+                    </label>
+                    <label>App secret
+                        <input type="text" name="kis.app_secret" value="{kis_cfg.get('app_secret', '')}" />
+                    </label>
+                    <label>Account no.
+                        <input type="text" name="kis.account_no" value="{kis_cfg.get('account_no', '')}" />
+                    </label>
+                </div>
+                <div class="row">
+                    <label>Account password
+                        <input type="text" name="kis.account_password" value="{kis_cfg.get('account_password', '')}" />
+                    </label>
+                    <label>Mode (paper/live)
+                        <input type="text" name="kis.mode" value="{kis_cfg.get('mode', 'paper')}" />
+                    </label>
+                    <label>Order lot size
+                        <input type="number" step="0.01" name="kis.order_lot_size" value="{kis_cfg.get('order_lot_size', 1.0)}" />
+                    </label>
+                </div>
+                <div class="row">
+                    <label>Exchange code
+                        <input type="text" name="kis.exchange_code" value="{kis_cfg.get('exchange_code', 'NASD')}" />
+                    </label>
+                    <label>Symbol
+                        <input type="text" name="kis.symbol" value="{kis_cfg.get('symbol', 'TQQQ')}" />
+                    </label>
+                    <label>Currency
+                        <input type="text" name="kis.currency" value="{kis_cfg.get('currency', 'USD')}" />
                     </label>
                 </div>
             </fieldset>

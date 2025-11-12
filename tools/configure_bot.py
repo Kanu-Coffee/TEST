@@ -25,7 +25,7 @@ def read_env(path: Path) -> Dict[str, str]:
 
 
 def write_env(path: Path, values: Dict[str, str]) -> None:
-    lines = ["# Generated configuration for the Bithumb bot"]
+    lines = ["# Generated configuration for the split-buy bot"]
     for key, value in values.items():
         lines.append(f"{key}={value}")
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -58,13 +58,52 @@ def interactive_yaml(path: Path) -> None:
         "home_assistant.reporting.port",
         "home_assistant.rest_api.port",
     }
+    float_fields = {"kis.order_lot_size"}
 
     prompts = [
+        ("bot.exchange", "Exchange (BITHUMB/KIS)", current["bot"].get("exchange", "BITHUMB")),
         ("bot.symbol_ticker", "Market ticker", current["bot"].get("symbol_ticker", "USDT_KRW")),
         ("bot.order_currency", "Order currency", current["bot"].get("order_currency", "USDT")),
         ("bot.payment_currency", "Payment currency", current["bot"].get("payment_currency", "KRW")),
         ("bot.hf_mode", "Enable HF mode? (y/n)", current["bot"].get("hf_mode", True)),
         ("bot.dry_run", "Enable dry-run? (y/n)", current["bot"].get("dry_run", True)),
+        ("bithumb.api_key", "Bithumb API key", current.get("bithumb", {}).get("api_key", "")),
+        ("bithumb.api_secret", "Bithumb API secret", current.get("bithumb", {}).get("api_secret", "")),
+        (
+            "bithumb.base_url",
+            "Bithumb base URL",
+            current.get("bithumb", {}).get("base_url", "https://api.bithumb.com"),
+        ),
+        (
+            "bithumb.auth_mode",
+            "Bithumb auth mode",
+            current.get("bithumb", {}).get("auth_mode", "legacy"),
+        ),
+        ("kis.app_key", "KIS app key", current.get("kis", {}).get("app_key", "")),
+        ("kis.app_secret", "KIS app secret", current.get("kis", {}).get("app_secret", "")),
+        (
+            "kis.account_no",
+            "KIS account number",
+            current.get("kis", {}).get("account_no", ""),
+        ),
+        (
+            "kis.account_password",
+            "KIS account password",
+            current.get("kis", {}).get("account_password", ""),
+        ),
+        ("kis.mode", "KIS mode (paper/live)", current.get("kis", {}).get("mode", "paper")),
+        (
+            "kis.exchange_code",
+            "KIS exchange code",
+            current.get("kis", {}).get("exchange_code", "NASD"),
+        ),
+        ("kis.symbol", "KIS symbol", current.get("kis", {}).get("symbol", "TQQQ")),
+        ("kis.currency", "KIS currency", current.get("kis", {}).get("currency", "USD")),
+        (
+            "kis.order_lot_size",
+            "KIS lot size",
+            current.get("kis", {}).get("order_lot_size", 1.0),
+        ),
         (
             "home_assistant.reporting.auto_generate",
             "Auto-generate report? (y/n)",
@@ -110,6 +149,11 @@ def interactive_yaml(path: Path) -> None:
                 return int(value)
             except ValueError:
                 return value
+        if key in float_fields:
+            try:
+                return float(value)
+            except ValueError:
+                return value
         return value
 
     print(f"Writing configuration to {path}\n")
@@ -142,6 +186,7 @@ def set_yaml_values(path: Path, pairs: Dict[str, str]) -> None:
         "home_assistant.reporting.port",
         "home_assistant.rest_api.port",
     }
+    float_fields = {"kis.order_lot_size"}
 
     for key, value in pairs.items():
         if key in bool_fields:
@@ -149,6 +194,11 @@ def set_yaml_values(path: Path, pairs: Dict[str, str]) -> None:
         elif key in int_fields:
             try:
                 _update_nested(current, key, int(value))
+            except ValueError:
+                _update_nested(current, key, value)
+        elif key in float_fields:
+            try:
+                _update_nested(current, key, float(value))
             except ValueError:
                 _update_nested(current, key, value)
         else:
@@ -159,10 +209,20 @@ def set_yaml_values(path: Path, pairs: Dict[str, str]) -> None:
 
 
 FIELDS = [
+    ("EXCHANGE", "Exchange (BITHUMB or KIS)"),
     ("BITHUMB_API_KEY", "Bithumb API key"),
     ("BITHUMB_API_SECRET", "Bithumb API secret"),
-    ("BITHUMB_BASE_URL", "API base URL (default: https://api.bithumb.com)"),
-    ("BITHUMB_AUTH_MODE", "Auth mode (legacy/jwt)"),
+    ("BITHUMB_BASE_URL", "Bithumb API base URL"),
+    ("BITHUMB_AUTH_MODE", "Bithumb auth mode (legacy/jwt)"),
+    ("KIS_APP_KEY", "KIS app key"),
+    ("KIS_APP_SECRET", "KIS app secret"),
+    ("KIS_ACCOUNT_NO", "KIS account number (e.g. 12345678-01)"),
+    ("KIS_ACCOUNT_PASSWORD", "KIS account password (optional)"),
+    ("KIS_MODE", "KIS mode (paper/live)"),
+    ("KIS_EXCHANGE_CODE", "KIS exchange code (e.g. NASD)"),
+    ("KIS_SYMBOL", "KIS symbol (e.g. TQQQ)"),
+    ("KIS_CURRENCY", "KIS settlement currency (e.g. USD)"),
+    ("KIS_ORDER_LOT_SIZE", "KIS order lot size (default 1)"),
     ("BOT_SYMBOL_TICKER", "Market ticker (e.g. USDT_KRW)"),
     ("BOT_ORDER_CURRENCY", "Order currency (e.g. USDT)"),
     ("BOT_PAYMENT_CURRENCY", "Payment currency (e.g. KRW)"),
