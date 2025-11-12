@@ -3,5 +3,6 @@ __pycache__/
 data/
 reports/
 .env
+
 config/bot_config.yaml
 data/ha_metrics.json

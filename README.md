@@ -1,3 +1,4 @@
+
 # Split-Buy Bot Toolkit
 
 This repository contains a high-frequency split-buy trading bot that now works
@@ -21,6 +22,21 @@ configuration helpers for long-running Home Assistant deployments.
 - Optional MQTT publisher and JSON metrics file (`data/ha_metrics.json`) for
   dashboards and automations.
 
+# Bithumb Split-Buy Bot Toolkit
+
+This repository contains a high-frequency split-buy trading bot tailored for the
+Bithumb USDT/KRW market. It also provides tooling for analysing historical
+trades and for managing configuration via environment variables.
+
+## Features
+
+- High-frequency trading loop that adapts to market volatility using EWMA.
+- CSV logging for fills, errors, and daily summaries in the `data/` directory.
+- Interactive HTML report generator powered by Chart.js.
+- CLI helper to create or update the `.env` configuration file.
+- Environment-driven configuration that separates credentials from code.
+
+
 ## Getting started (English)
 
 1. (Optional) Create a virtual environment and install dependencies if you plan
@@ -37,6 +53,7 @@ configuration helpers for long-running Home Assistant deployments.
    python tools/configure_bot.py
    ```
 
+
    - Choose the exchange (`BITHUMB` or `KIS`) when prompted and provide the
      corresponding credentials.
    - Use `--set KEY=VALUE` pairs for non-interactive updates.
@@ -44,6 +61,9 @@ configuration helpers for long-running Home Assistant deployments.
      `python tools/configure_bot.py --yaml` or copy
      `config/bot_config.example.yaml` to `config/bot_config.yaml` and edit it
      manually.
+
+   Use `--set KEY=VALUE` pairs for non-interactive updates.
+
 4. Run the bot (defaults to dry-run mode until disabled in the `.env` file):
 
    ```bash
@@ -55,6 +75,7 @@ configuration helpers for long-running Home Assistant deployments.
    ```bash
    python tools/generate_report.py
    ```
+
 
    The default output lives in `reports/latest.html`.
 
@@ -68,6 +89,9 @@ configuration helpers for long-running Home Assistant deployments.
    - `GET /metrics` returns the latest JSON snapshot (`data/ha_metrics.json`) when `rest_api.enabled` is `true`.
    - `/generate-report` forces an immediate refresh and `/report` serves the latest Chart.js dashboard when
      `reporting.serve_report` is enabled.
+
+   The default output lives in `reports/bithumb_report.html`.
+
 
 ## 빠르게 시작하기 (한국어)
 
