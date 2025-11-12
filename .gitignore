@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+data/
+reports/
+.env
+config/bot_config.yaml
+data/ha_metrics.json
