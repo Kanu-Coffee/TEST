@@ -1,0 +1,124 @@
+{
+  "configuration": {
+    "step": {
+      "user": {
+        "title": "빗썸/KIS 자동매매 봇 설정",
+        "description": "애드온을 시작하기 전에 아래 항목을 순서대로 채워주세요.\n* **거래소**를 선택하면 필요한 인증 정보가 무엇인지 설명이 나타납니다.\n* \"필수\"로 표시된 값은 실거래(DRY RUN 해제) 전에 반드시 입력해야 합니다.",
+        "data": {
+          "repository_url": {
+            "title": "저장소 URL (필수)",
+            "description": "애드온 컨테이너 안에 클론할 Git 저장소 주소입니다."
+          },
+          "repository_ref": {
+            "title": "브랜치 또는 태그 (필수)",
+            "description": "클론 후 체크아웃할 브랜치·태그·커밋을 지정합니다."
+          },
+          "exchange": {
+            "title": "거래소 선택 (필수)",
+            "description": "빗썸(가상자산) 또는 한국투자증권 KIS(해외주식) 중 하나를 고릅니다."
+          },
+          "bot_symbol_ticker": {
+            "title": "기본 종목 코드 (필수)",
+            "description": "빗썸 예: USDT_KRW / KIS 예: TQQQ 처럼 사용할 티커를 적습니다."
+          },
+          "bot_order_currency": {
+            "title": "주문 자산 (필수)",
+            "description": "매수/매도에 사용할 자산 코드(코인 심볼 또는 주식 티커)입니다."
+          },
+          "bot_payment_currency": {
+            "title": "정산 통화 (필수)",
+            "description": "가격 계산에 사용하는 통화 (예: KRW, USD)."
+          },
+          "bot_dry_run": {
+            "title": "드라이런 모드 (필수)",
+            "description": "테스트 중에는 반드시 켜두세요. 실매매 전환 시에만 해제합니다."
+          },
+          "bot_hf_mode": {
+            "title": "고빈도 모드 (선택)",
+            "description": "더 촘촘한 매수 간격과 빠른 루프를 사용하는 HF 파라미터를 적용합니다."
+          },
+          "default_base_order_value": {
+            "title": "기본 모드 1차 주문금액 (필수)",
+            "description": "일반 그리드 첫 주문 금액 (정산 통화 기준, KRW 또는 USD)."
+          },
+          "default_buy_step": {
+            "title": "기본 모드 간격 (필수)",
+            "description": "일반 그리드의 가격 간격 (소수 표기, 0.008 = 0.8%)."
+          },
+          "default_martingale_mul": {
+            "title": "기본 모드 마틴배율 (필수)",
+            "description": "추가 매수마다 주문금액에 곱해지는 배수입니다."
+          },
+          "default_max_steps": {
+            "title": "기본 모드 최대 스텝 (필수)",
+            "description": "일반 그리드에서 허용할 최대 매수 횟수입니다."
+          },
+          "hf_base_order_value": {
+            "title": "HF 모드 1차 주문금액 (선택)",
+            "description": "고빈도 그리드의 첫 주문 금액입니다."
+          },
+          "hf_buy_step": {
+            "title": "HF 모드 간격 (선택)",
+            "description": "고빈도 그리드의 가격 간격 (소수 표기, 0.005 = 0.5%)."
+          },
+          "hf_martingale_mul": {
+            "title": "HF 모드 마틴배율 (선택)",
+            "description": "고빈도 그리드에서 추가 매수마다 적용되는 배수입니다."
+          },
+          "hf_max_steps": {
+            "title": "HF 모드 최대 스텝 (선택)",
+            "description": "고빈도 그리드에서 허용할 최대 매수 횟수입니다."
+          },
+          "bithumb_api_key": {
+            "title": "빗썸 API Key (빗썸 선택 시 필수)",
+            "description": "빗썸 계정에서 발급받은 개인 API Key를 입력하세요."
+          },
+          "bithumb_api_secret": {
+            "title": "빗썸 API Secret (빗썸 선택 시 필수)",
+            "description": "위 Key와 짝이 되는 Secret을 안전하게 입력하세요."
+          },
+          "kis_app_key": {
+            "title": "KIS AppKey (KIS 선택 시 필수)",
+            "description": "한국투자증권 OpenAPI에서 발급받은 AppKey입니다."
+          },
+          "kis_app_secret": {
+            "title": "KIS AppSecret (KIS 선택 시 필수)",
+            "description": "AppKey와 한 쌍인 AppSecret을 입력합니다."
+          },
+          "kis_account_no": {
+            "title": "KIS 계좌번호 (KIS 선택 시 필수)",
+            "description": "하이픈 없이 입력하세요. 모의·실전 모두 주문 시 필요합니다."
+          },
+          "kis_account_password": {
+            "title": "KIS 계좌 비밀번호 (KIS 선택 시 필수)",
+            "description": "OpenAPI 주문에 필요한 비밀번호입니다."
+          },
+          "kis_mode": {
+            "title": "KIS 거래 모드 (KIS 선택 시 필수)",
+            "description": "모의투자는 paper, 실전은 live를 선택합니다."
+          },
+          "kis_exchange_code": {
+            "title": "KIS 거래소 코드 (선택)",
+            "description": "예) NASD = 나스닥. KIS에서 요구하는 시장 코드를 입력합니다."
+          },
+          "kis_symbol": {
+            "title": "KIS 종목 코드 (선택)",
+            "description": "거래할 주식/ETF 심볼 (예: TQQQ)."
+          },
+          "kis_currency": {
+            "title": "KIS 정산 통화 (선택)",
+            "description": "대부분 미주 시장은 USD를 사용합니다."
+          },
+          "kis_order_lot_size": {
+            "title": "KIS 주문 수량 (선택)",
+            "description": "주(share) 단위 주문 수량입니다. 필요 시 소수점도 허용됩니다."
+          },
+          "enable_gateway": {
+            "title": "게이트웨이 활성화 (선택)",
+            "description": "8080 포트에서 FastAPI 게이트웨이(리포트/메트릭)를 열어둡니다."
+          }
+        }
+      }
+    }
+  }
+}

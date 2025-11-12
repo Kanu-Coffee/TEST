@@ -1,7 +1,7 @@
 name: Bithumb/KIS Trading Bot
 slug: bithumb_kis_bot
 description: Grid trading bot with Bithumb and KIS multi-exchange support plus optional Home Assistant gateway
-version: 0.1.1
+version: 0.1.2
 arch:
   - amd64
   - aarch64
@@ -47,7 +47,6 @@ options:
   kis_currency: USD
   kis_order_lot_size: 1.0
   enable_gateway: false
-  env_vars: []
 schema:
   repository_url: str
   repository_ref: str
@@ -77,6 +76,4 @@ schema:
   kis_currency: str?
   kis_order_lot_size: float?
   enable_gateway: bool
-  env_vars:
-    - str
 watchdog: http://[HOST]:8080/health

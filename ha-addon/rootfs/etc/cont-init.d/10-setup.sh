@@ -29,7 +29,6 @@ KIS_SYMBOL="$(bashio::config 'kis_symbol')"
 KIS_CURRENCY="$(bashio::config 'kis_currency')"
 KIS_ORDER_LOT_SIZE="$(bashio::config 'kis_order_lot_size')"
 ENABLE_GATEWAY="$(bashio::config 'enable_gateway')"
-ENV_VARS_COUNT=$(bashio::config 'env_vars | length')
 
 SYMBOL=${SYMBOL:-USDT_KRW}
 ORDER_CCY=${ORDER_CCY:-USDT}
@@ -125,13 +124,6 @@ ENV_FILE="/data/bot/.env"
     printf 'KIS_CURRENCY=%s\n' "${KIS_CURRENCY}"
     printf 'KIS_ORDER_LOT_SIZE=%s\n' "${KIS_ORDER_LOT_SIZE}"
 } > "${ENV_FILE}"
-
-for ((i=0; i<ENV_VARS_COUNT; i++)); do
-    VALUE="$(bashio::config "env_vars[${i}]")"
-    if [[ -n "${VALUE}" ]]; then
-        printf '%s\n' "${VALUE}" >> "${ENV_FILE}"
-    fi
-done
 
 echo "ENABLE_GATEWAY=${ENABLE_GATEWAY}" > /var/run/ha_bot_enable_gateway
 

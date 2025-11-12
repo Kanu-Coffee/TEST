@@ -215,10 +215,10 @@ These files power the HTML report generated via `tools/generate_report.py`.
    | 전략 | `default_*`, `hf_*` 필드 | 기본/고빈도 그리드의 첫 주문 금액, 간격, 마틴배율, 최대 스텝을 조정합니다. (소수 표기: 0.005 = 0.5%) |
    | 빗썸 선택 시 | `bithumb_api_key`, `bithumb_api_secret` | 실거래하려면 빗썸 API Key/Secret을 반드시 입력하세요. 드라이런 중 비워두면 경고만 출력됩니다. |
    | KIS 선택 시 | `kis_app_key`, `kis_app_secret`, `kis_account_no`, `kis_account_password` | 한국투자증권 OpenAPI 주문에 필요한 기본 인증 값입니다. `kis_mode`로 모의/실전을 선택하세요. |
-   | 선택 | `env_vars` | 추가로 넣고 싶은 환경변수가 있으면 `KEY=VALUE` 형식으로 한 줄씩 입력합니다. |
-   | 게이트웨이 | `enable_gateway` | 리포트/설정/메트릭을 8080 포트로 노출하려면 `true`로 변경합니다. |
+  | 선택 | `kis_exchange_code`, `kis_symbol`, `kis_currency`, `kis_order_lot_size` | KIS 환경에서만 필요합니다. 기본값을 그대로 두거나 원하는 값으로 수정하세요. |
+  | 게이트웨이 | `enable_gateway` | 리포트/설정/메트릭을 8080 포트로 노출하려면 `true`로 변경합니다. |
 
-   저장 후 컨테이너는 `/data/bot/.env`를 생성해 위 값들을 모두 반영합니다. 실거래 전에는 `bot_dry_run=true` 상태에서 로그와 리포트를 먼저 확인하세요.
+  저장 후 컨테이너는 `/data/bot/.env`를 생성해 위 값들을 모두 반영합니다. 각 입력창에는 (필수)/(선택) 표시와 간단한 설명이 함께 노출되므로, 표와 함께 참고해 값을 채워 주세요. 실거래 전에는 `bot_dry_run=true` 상태에서 로그와 리포트를 먼저 확인하세요.
 
 4. **애드온 시작** – “시작(Start)” 버튼을 누르면 컨테이너가 자동으로 아래 작업을 수행합니다.
 
