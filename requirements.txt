@@ -1,1 +1,6 @@
 requests>=2.31
+fastapi>=0.110
+uvicorn[standard]>=0.22
+paho-mqtt>=1.6
+PyYAML>=6.0
+python-multipart>=0.0.6

@@ -1,20 +1,25 @@
-"""Configuration utilities for the Bithumb split-buy bot."""
+"""Configuration utilities for the multi-exchange split-buy bot."""
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field, fields, is_dataclass, replace
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any, Dict
+
+try:  # pragma: no cover - optional dependency guard
+    import yaml
+except ImportError:  # pragma: no cover - fallback when PyYAML missing
+    yaml = None  # type: ignore
+
 
 ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
+CONFIG_DIR = Path(__file__).resolve().parent.parent / "config"
+YAML_FILE = CONFIG_DIR / "bot_config.yaml"
 
 
 def _load_env_file(path: Path = ENV_FILE) -> None:
-    """Populate ``os.environ`` with values from a simple ``.env`` file.
+    """Populate ``os.environ`` with values from a simple ``.env`` file."""
 
-    Lines starting with ``#`` are treated as comments. Values keep their original
-    whitespace except for the trailing newline.
-    """
     if not path.exists():
         return
     for line in path.read_text(encoding="utf-8").splitlines():
@@ -27,6 +32,31 @@ def _load_env_file(path: Path = ENV_FILE) -> None:
         key = key.strip()
         value = value.strip().strip('"')
         os.environ.setdefault(key, value)
+
+
+def _load_yaml_dict(path: Path = YAML_FILE) -> Dict[str, Any]:
+    if yaml is None or not path.exists():
+        return {}
+    data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    if not isinstance(data, dict):
+        return {}
+    return data
+
+
+def load_yaml_config(path: Path | None = None) -> Dict[str, Any]:
+    """Return the raw YAML configuration if present."""
+
+    return _load_yaml_dict(path or YAML_FILE)
+
+
+def save_yaml_config(data: Dict[str, Any], path: Path = YAML_FILE) -> None:
+    """Persist the YAML configuration, creating the config directory if needed."""
+
+    if yaml is None:
+        raise RuntimeError("PyYAML is required to save YAML configuration files")
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as fh:
+        yaml.safe_dump(data, fh, sort_keys=False, allow_unicode=True)
 
 
 def _get_bool(name: str, default: bool) -> bool:
@@ -57,7 +87,7 @@ def _get_float(name: str, default: float) -> float:
 
 
 @dataclass
-class AuthConfig:
+class BithumbConfig:
     api_key: str = ""
     api_secret: str = ""
     base_url: str = "https://api.bithumb.com"
@@ -65,11 +95,26 @@ class AuthConfig:
 
 
 @dataclass
+class KisConfig:
+    app_key: str = ""
+    app_secret: str = ""
+    account_no: str = ""
+    account_password: str = ""
+    mode: str = "paper"  # "paper" | "live"
+    exchange_code: str = "NASD"
+    symbol: str = "TQQQ"
+    currency: str = "USD"
+    order_lot_size: float = 1.0
+    base_url_paper: str = "https://openapivts.koreainvestment.com:29443"
+    base_url_live: str = "https://openapi.koreainvestment.com:9443"
+
+
+@dataclass
 class StrategyParams:
     buy_step: float
     martingale_mul: float
     max_steps: int
-    base_krw: int
+    base_order_value: float
 
     vol_halflife: int
     vol_min: float
@@ -98,11 +143,24 @@ class StrategyParams:
                 return _get_float(env_name, default)
             return os.environ.get(env_name, default)
 
+        def _base_value(default_value: float) -> float:
+            primary = os.environ.get(f"{prefix}_BASE_ORDER_VALUE")
+            legacy = os.environ.get(f"{prefix}_BASE_KRW") if primary is None else None
+            raw = primary if primary is not None else legacy
+            if raw is None:
+                return default_value
+            try:
+                return float(raw)
+            except ValueError:
+                return default_value
+
+        base_default = defaults.get("BASE_ORDER_VALUE", defaults.get("BASE_KRW", 0))
+
         return cls(
             buy_step=_field("buy_step", defaults["BUY_STEP"]),
             martingale_mul=_field("martingale_mul", defaults["MARTINGALE_MUL"]),
             max_steps=_field("max_steps", defaults["MAX_STEPS"]),
-            base_krw=_field("base_krw", defaults["BASE_KRW"]),
+            base_order_value=_base_value(base_default),
             vol_halflife=_field("vol_halflife", defaults["VOL_HALFLIFE"]),
             vol_min=_field("vol_min", defaults["VOL_MIN"]),
             vol_max=_field("vol_max", defaults["VOL_MAX"]),
@@ -121,30 +179,88 @@ class StrategyParams:
 
 
 @dataclass
+class MQTTConfig:
+    enabled: bool = False
+    host: str = "127.0.0.1"
+    port: int = 1883
+    username: str = ""
+    password: str = ""
+    base_topic: str = "bithumb_bot"
+
+
+@dataclass
+class ReportingConfig:
+    auto_generate: bool = False
+    interval_minutes: int = 60
+    serve_report: bool = False
+    host: str = "0.0.0.0"
+    port: int = 8080
+    ingress_path: str = "/"
+    output_path: str = "reports/latest.html"
+
+
+@dataclass
+class RestAPIConfig:
+    enabled: bool = False
+    host: str = "0.0.0.0"
+    port: int = 8080
+
+
+@dataclass
+class HomeAssistantConfig:
+    metrics_file: str = "ha_metrics.json"
+    mqtt: MQTTConfig = field(default_factory=MQTTConfig)
+    reporting: ReportingConfig = field(default_factory=ReportingConfig)
+    rest_api: RestAPIConfig = field(default_factory=RestAPIConfig)
+
+
+@dataclass
 class BotConfig:
+    exchange: str
     symbol_ticker: str
     order_currency: str
     payment_currency: str
     hf_mode: bool
     dry_run: bool
-    auth: AuthConfig = field(default_factory=AuthConfig)
+    bithumb: BithumbConfig = field(default_factory=BithumbConfig)
+    kis: KisConfig = field(default_factory=KisConfig)
     default_params: StrategyParams = field(default_factory=StrategyParams)
     hf_params: StrategyParams = field(default_factory=StrategyParams)
+    home_assistant: HomeAssistantConfig = field(default_factory=HomeAssistantConfig)
 
     @classmethod
     def load(cls) -> "BotConfig":
         _load_env_file()
+        exchange = os.environ.get("EXCHANGE", "BITHUMB").upper() or "BITHUMB"
         hf_mode = _get_bool("BOT_HF_MODE", True)
         dry_run = _get_bool("BOT_DRY_RUN", True)
         symbol_ticker = os.environ.get("BOT_SYMBOL_TICKER", "USDT_KRW")
         order_cc = os.environ.get("BOT_ORDER_CURRENCY", "USDT")
         pay_cc = os.environ.get("BOT_PAYMENT_CURRENCY", "KRW")
 
-        auth = AuthConfig(
+        bithumb = BithumbConfig(
             api_key=os.environ.get("BITHUMB_API_KEY", ""),
             api_secret=os.environ.get("BITHUMB_API_SECRET", ""),
             base_url=os.environ.get("BITHUMB_BASE_URL", "https://api.bithumb.com"),
             auth_mode=os.environ.get("BITHUMB_AUTH_MODE", "legacy"),
+        )
+
+        kis = KisConfig(
+            app_key=os.environ.get("KIS_APP_KEY", ""),
+            app_secret=os.environ.get("KIS_APP_SECRET", ""),
+            account_no=os.environ.get("KIS_ACCOUNT_NO", ""),
+            account_password=os.environ.get("KIS_ACCOUNT_PASSWORD", ""),
+            mode=os.environ.get("KIS_MODE", "paper"),
+            exchange_code=os.environ.get("KIS_EXCHANGE_CODE", "NASD"),
+            symbol=os.environ.get("KIS_SYMBOL", "TQQQ"),
+            currency=os.environ.get("KIS_CURRENCY", "USD"),
+            order_lot_size=_get_float("KIS_ORDER_LOT_SIZE", 1.0),
+            base_url_paper=os.environ.get(
+                "KIS_BASE_URL_PAPER", "https://openapivts.koreainvestment.com:29443"
+            ),
+            base_url_live=os.environ.get(
+                "KIS_BASE_URL_LIVE", "https://openapi.koreainvestment.com:9443"
+            ),
         )
 
         default_params = StrategyParams.from_prefix(
@@ -153,6 +269,7 @@ class BotConfig:
                 "MARTINGALE_MUL": 1.5,
                 "MAX_STEPS": 10,
                 "BASE_KRW": 5000,
+                "BASE_ORDER_VALUE": 5000,
                 "VOL_HALFLIFE": 60,
                 "VOL_MIN": 0.0010,
                 "VOL_MAX": 0.0150,
@@ -176,6 +293,7 @@ class BotConfig:
                 "MARTINGALE_MUL": 1.3,
                 "MAX_STEPS": 10,
                 "BASE_KRW": 5000,
+                "BASE_ORDER_VALUE": 5000,
                 "VOL_HALFLIFE": 30,
                 "VOL_MIN": 0.0045,
                 "VOL_MAX": 0.0150,
@@ -193,16 +311,94 @@ class BotConfig:
             }
         )
 
+        yaml_cfg = _load_yaml_dict()
+
+        bot_section = yaml_cfg.get("bot", {}) if isinstance(yaml_cfg, dict) else {}
+        if isinstance(bot_section, dict):
+            exchange = (bot_section.get("exchange", exchange) or exchange).upper()
+            symbol_ticker = bot_section.get("symbol_ticker", symbol_ticker) or symbol_ticker
+            order_cc = bot_section.get("order_currency", order_cc) or order_cc
+            pay_cc = bot_section.get("payment_currency", pay_cc) or pay_cc
+            hf_mode = bool(bot_section.get("hf_mode", hf_mode))
+            dry_run = bool(bot_section.get("dry_run", dry_run))
+
+        bithumb_section = yaml_cfg.get("bithumb", {}) if isinstance(yaml_cfg, dict) else {}
+        if isinstance(bithumb_section, dict):
+            bithumb = _replace_dataclass(bithumb, bithumb_section)
+
+        kis_section = yaml_cfg.get("kis", {}) if isinstance(yaml_cfg, dict) else {}
+        if isinstance(kis_section, dict):
+            kis = _replace_dataclass(kis, kis_section)
+
+        strategy_section = yaml_cfg.get("strategy", {}) if isinstance(yaml_cfg, dict) else {}
+        if isinstance(strategy_section, dict):
+            default_overrides = strategy_section.get("default", {})
+            hf_overrides = strategy_section.get("hf", {})
+            default_params = _replace_dataclass(default_params, default_overrides)
+            hf_params = _replace_dataclass(hf_params, hf_overrides)
+
+        home_assistant_section = yaml_cfg.get("home_assistant", {}) if isinstance(yaml_cfg, dict) else {}
+        home_assistant = _replace_dataclass(
+            HomeAssistantConfig(),
+            home_assistant_section if isinstance(home_assistant_section, dict) else {},
+        )
+
         return cls(
+            exchange=exchange,
             symbol_ticker=symbol_ticker,
             order_currency=order_cc,
             payment_currency=pay_cc,
             hf_mode=hf_mode,
             dry_run=dry_run,
-            auth=auth,
+            bithumb=bithumb,
+            kis=kis,
             default_params=default_params,
             hf_params=hf_params,
+            home_assistant=home_assistant,
         )
 
 
-__all__ = ["BotConfig", "AuthConfig", "StrategyParams"]
+def _replace_dataclass(obj, overrides: Dict[str, Any] | None):
+    if overrides is None:
+        return obj
+    updates: Dict[str, Any] = {}
+    for field_info in fields(obj):
+        name = field_info.name
+        if name not in overrides:
+            continue
+        value = overrides[name]
+        current = getattr(obj, name)
+        if value is None:
+            continue
+        if is_dataclass(current) and isinstance(value, dict):
+            updates[name] = _replace_dataclass(current, value)
+        else:
+            updates[name] = value
+    if not updates:
+        return obj
+    return replace(obj, **updates)
+
+
+def config_to_yaml_dict(config: BotConfig) -> Dict[str, Any]:
+    """Convert the runtime configuration into a structure suitable for YAML."""
+
+    return {
+        "bot": {
+            "exchange": config.exchange,
+            "symbol_ticker": config.symbol_ticker,
+            "order_currency": config.order_currency,
+            "payment_currency": config.payment_currency,
+            "hf_mode": config.hf_mode,
+            "dry_run": config.dry_run,
+        },
+        "bithumb": asdict(config.bithumb),
+        "kis": asdict(config.kis),
+        "strategy": {
+            "default": asdict(config.default_params),
+            "hf": asdict(config.hf_params),
+        },
+        "home_assistant": asdict(config.home_assistant),
+    }
+
+
+__all__ = ["BotConfig", "BithumbConfig", "KisConfig", "StrategyParams"]

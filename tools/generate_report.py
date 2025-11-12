@@ -5,14 +5,26 @@ import argparse
 import csv
 import json
 from pathlib import Path
-from typing import List, Tuple
+from typing import Dict, List, Tuple
+
+from bot.config import BotConfig
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 REPORTS_DIR = Path(__file__).resolve().parent.parent / "reports"
 REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+DEFAULT_REPORT = REPORTS_DIR / "latest.html"
 
-TRADE_LOG = DATA_DIR / "bithumb_trades.csv"
-SUMMARY_LOG = DATA_DIR / "bithumb_daily_summary.csv"
+
+def _slug(config: BotConfig) -> str:
+    return config.exchange.lower()
+
+
+def _trade_log(config: BotConfig) -> Path:
+    return DATA_DIR / f"{_slug(config)}_trades.csv"
+
+
+def _summary_log(config: BotConfig) -> Path:
+    return DATA_DIR / f"{_slug(config)}_daily_summary.csv"
 
 
 def _parse_float(value: str) -> float:
@@ -22,14 +34,14 @@ def _parse_float(value: str) -> float:
         return 0.0
 
 
-def load_trades() -> Tuple[List[str], List[float], List[float]]:
+def load_trades(path: Path) -> Tuple[List[str], List[float], List[float]]:
     times: List[str] = []
     pnl: List[float] = []
     cumulative: List[float] = []
     total = 0.0
-    if not TRADE_LOG.exists():
+    if not path.exists():
         return times, pnl, cumulative
-    with TRADE_LOG.open("r", encoding="utf-8") as f:
+    with path.open("r", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for row in reader:
             if row.get("event") != "SELL":
@@ -42,12 +54,16 @@ def load_trades() -> Tuple[List[str], List[float], List[float]]:
     return times, pnl, cumulative
 
 
-def load_summary() -> List[dict]:
-    if not SUMMARY_LOG.exists():
+def load_summary(path: Path) -> List[dict]:
+    if not path.exists():
         return []
-    with SUMMARY_LOG.open("r", encoding="utf-8") as f:
+    with path.open("r", encoding="utf-8") as f:
         reader = csv.DictReader(f)
-        return list(reader)
+        rows = list(reader)
+    for row in rows:
+        if "realized_profit" not in row and "realized_profit_krw" in row:
+            row["realized_profit"] = row.get("realized_profit_krw", "0")
+    return rows
 
 
 def compute_stats(pnl: List[float]) -> dict:
@@ -65,20 +81,27 @@ def compute_stats(pnl: List[float]) -> dict:
     return stats
 
 
-def build_html(times: List[str], pnl: List[float], cumulative: List[float], daily: List[dict]) -> str:
+def build_html(
+    config: BotConfig,
+    times: List[str],
+    pnl: List[float],
+    cumulative: List[float],
+    daily: List[dict],
+) -> str:
     stats = compute_stats(pnl)
     daily_dates = [row.get("date") for row in daily]
-    daily_profit = [_parse_float(row.get("realized_profit_krw")) for row in daily]
+    daily_profit = [_parse_float(row.get("realized_profit")) for row in daily]
     pnl_colors = [
         "rgba(34,197,94,0.7)" if value >= 0 else "rgba(239,68,68,0.7)" for value in pnl
     ]
+    currency = config.payment_currency if config.exchange != "KIS" else config.kis.currency
 
     return f"""
 <!DOCTYPE html>
 <html lang=\"en\">
 <head>
     <meta charset=\"utf-8\">
-    <title>Bithumb Bot Performance</title>
+    <title>Bot Performance ({config.exchange})</title>
     <script src=\"https://cdn.jsdelivr.net/npm/chart.js\"></script>
     <style>
         body {{ font-family: Arial, sans-serif; margin: 2rem; background: #0f172a; color: #e2e8f0; }}
@@ -93,18 +116,18 @@ def build_html(times: List[str], pnl: List[float], cumulative: List[float], dail
     </style>
 </head>
 <body>
-    <h1>Bithumb Split-Buy Bot Report</h1>
+    <h1>Split-Buy Bot Report ({config.exchange})</h1>
     <section class=\"grid\">
         <div class=\"card\">
             <h2>Overview</h2>
             <p>Total trades: {stats['trades']}</p>
             <p>Win rate: {stats['win_rate']:.2f}%</p>
-            <p>Net PnL: {stats['net']:.2f} KRW</p>
+            <p>Net PnL: {stats['net']:.2f} {currency}</p>
         </div>
         <div class=\"card\">
             <h2>Profit Breakdown</h2>
-            <p>Gross profit: {stats['gross_profit']:.2f} KRW</p>
-            <p>Gross loss: {stats['gross_loss']:.2f} KRW</p>
+            <p>Gross profit: {stats['gross_profit']:.2f} {currency}</p>
+            <p>Gross loss: {stats['gross_loss']:.2f} {currency}</p>
             <p>Wins / Losses: {stats['wins']} / {stats['losses']}</p>
         </div>
     </section>
@@ -126,14 +149,14 @@ def build_html(times: List[str], pnl: List[float], cumulative: List[float], dail
             <thead>
                 <tr>
                     <th>Date</th>
-                    <th>Realized PnL (KRW)</th>
+                    <th>Realized PnL ({currency})</th>
                     <th>Trades</th>
                     <th>Win</th>
                     <th>Loss</th>
                 </tr>
             </thead>
             <tbody>
-                {''.join(f"<tr><td>{row.get('date')}</td><td>{row.get('realized_profit_krw')}</td><td>{row.get('trades')}</td><td>{row.get('win')}</td><td>{row.get('loss')}</td></tr>" for row in daily)}
+                {''.join(f"<tr><td>{row.get('date')}</td><td>{row.get('realized_profit')}</td><td>{row.get('trades')}</td><td>{row.get('win')}</td><td>{row.get('loss')}</td></tr>" for row in daily)}
             </tbody>
         </table>
     </section>
@@ -145,7 +168,7 @@ def build_html(times: List[str], pnl: List[float], cumulative: List[float], dail
             data: {{
                 labels: {json.dumps(times)},
                 datasets: [{{
-                    label: 'Cumulative PnL (KRW)',
+                    label: 'Cumulative PnL ({currency})',
                     data: {json.dumps(cumulative)},
                     borderColor: '#34d399',
                     backgroundColor: 'rgba(52, 211, 153, 0.2)',
@@ -168,7 +191,7 @@ def build_html(times: List[str], pnl: List[float], cumulative: List[float], dail
             data: {{
                 labels: {json.dumps(times)},
                 datasets: [{{
-                    label: 'Trade PnL (KRW)',
+                    label: 'Trade PnL ({currency})',
                     data: {json.dumps(pnl)},
                     backgroundColor: {json.dumps(pnl_colors)}
                 }}]
@@ -188,7 +211,7 @@ def build_html(times: List[str], pnl: List[float], cumulative: List[float], dail
             data: {{
                 labels: {json.dumps(daily_dates)},
                 datasets: [{{
-                    label: 'Daily Realized PnL (KRW)',
+                    label: 'Daily Realized PnL ({currency})',
                     data: {json.dumps(daily_profit)},
                     backgroundColor: 'rgba(59,130,246,0.7)'
                 }}]
@@ -207,25 +230,41 @@ def build_html(times: List[str], pnl: List[float], cumulative: List[float], dail
 """
 
 
-def generate(output: Path) -> Path:
-    times, pnl, cumulative = load_trades()
-    daily = load_summary()
-    html = build_html(times, pnl, cumulative, daily)
-    output.write_text(html, encoding="utf-8")
-    return output
+def generate_report(
+    output: Path | None = None,
+    *,
+    config: BotConfig | None = None,
+) -> Dict[str, object]:
+    config = config or BotConfig.load()
+    trade_path = _trade_log(config)
+    summary_path = _summary_log(config)
+    times, pnl, cumulative = load_trades(trade_path)
+    daily = load_summary(summary_path)
+    html = build_html(config, times, pnl, cumulative, daily)
+    target = output or DEFAULT_REPORT
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(html, encoding="utf-8")
+    return {
+        "path": str(target),
+        "stats": compute_stats(pnl),
+        "trades": len(pnl),
+        "daily": daily,
+    }
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Generate an HTML report from bot CSV logs.")
+    parser = argparse.ArgumentParser(
+        description="Generate an HTML report using the configured exchange logs."
+    )
     parser.add_argument(
         "--output",
         type=Path,
-        default=REPORTS_DIR / "bithumb_report.html",
+        default=DEFAULT_REPORT,
         help="Target HTML file",
     )
     args = parser.parse_args()
-    path = generate(args.output)
-    print(f"Report generated at {path}")
+    result = generate_report(args.output)
+    print(json.dumps(result, ensure_ascii=False))
 
 
 if __name__ == "__main__":
