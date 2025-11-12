@@ -1,8 +1,10 @@
-"""Common exchange abstractions for the trading bot."""
+"""Base classes for exchange adapters."""
 from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any, Iterable
+
+from bot.config import BotConfig
 
 
 @dataclass
@@ -27,9 +29,12 @@ class OpenOrder:
 class Exchange:
     """Abstract exchange interface consumed by the trading loop."""
 
-    def __init__(self, config):
+    def __init__(self, config: BotConfig) -> None:
         self.config = config
 
+    # ------------------------------------------------------------------
+    # Required API
+    # ------------------------------------------------------------------
     def fetch_quote(self) -> Quote:
         raise NotImplementedError
 
@@ -42,6 +47,9 @@ class Exchange:
     def list_open_orders(self) -> Iterable[OpenOrder]:
         raise NotImplementedError
 
+    # ------------------------------------------------------------------
+    # Helper utilities
+    # ------------------------------------------------------------------
     def round_price(self, price: float) -> float:
         return price
 
@@ -61,3 +69,6 @@ class Exchange:
 
     def is_notional_sufficient(self, notional: float, quantity: float) -> bool:
         return notional >= self.min_notional() and quantity > 0
+
+
+__all__ = ["Exchange", "Quote", "OrderResult", "OpenOrder"]

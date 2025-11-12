@@ -16,4 +16,4 @@ if [ -f /var/run/ha_bot_enable_gateway ] && grep -qi "true" /var/run/ha_bot_enab
 fi
 
 bashio::log.info "Starting trading bot"
-exec python3 -m bot.bithumb_bot
+exec python3 -m bot

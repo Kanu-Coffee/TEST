@@ -1,4 +1,4 @@
-"""Korea Investment & Securities (KIS) exchange adapter."""
+"""Korea Investment & Securities (KIS) overseas stock adapter."""
 from __future__ import annotations
 
 import json
@@ -14,13 +14,10 @@ from .base import Exchange, OpenOrder, OrderResult, Quote
 
 
 class KisExchange(Exchange):
-    """Implementation of the KIS overseas stock API."""
+    _TOKEN_TTL = 3000  # seconds
 
-    _TOKEN_TTL = 3000  # seconds, refreshed proactively
-
-    def __init__(self, config: BotConfig):
+    def __init__(self, config: BotConfig) -> None:
         super().__init__(config)
-        self._cfg = config.kis
         self._session = requests.Session()
         self._token: str | None = None
         self._token_expiry: float = 0.0
@@ -28,15 +25,13 @@ class KisExchange(Exchange):
     # ------------------------------------------------------------------
     # Utilities
     # ------------------------------------------------------------------
-    def _base_url(self) -> str:
-        return (
-            self._cfg.base_url_live.rstrip("/")
-            if self._cfg.mode.lower() == "live"
-            else self._cfg.base_url_paper.rstrip("/")
-        )
-
     def _is_live(self) -> bool:
-        return self._cfg.mode.lower() == "live"
+        return self.config.kis.mode.lower() == "live"
+
+    def _base_url(self) -> str:
+        if self._is_live():
+            return self.config.kis.base_url_live.rstrip("/")
+        return self.config.kis.base_url_paper.rstrip("/")
 
     def _ensure_token(self) -> str:
         now = time.time()
@@ -45,25 +40,25 @@ class KisExchange(Exchange):
         url = f"{self._base_url()}/oauth2/token"
         body = {
             "grant_type": "client_credentials",
-            "appkey": self._cfg.app_key,
-            "appsecret": self._cfg.app_secret,
+            "appkey": self.config.kis.app_key,
+            "appsecret": self.config.kis.app_secret,
         }
         resp = self._session.post(url, json=body, timeout=10)
         data = resp.json()
         token = data.get("access_token")
         if not token:
             raise RuntimeError(f"Failed to obtain KIS token: {data}")
+        expires = int(data.get("expires_in", self._TOKEN_TTL))
         self._token = token
-        expires_in = int(data.get("expires_in", self._TOKEN_TTL))
-        self._token_expiry = now + max(60, expires_in - 60)
+        self._token_expiry = now + max(60, expires - 60)
         return token
 
     def _hash_body(self, body: Dict[str, Any]) -> str:
         url = f"{self._base_url()}/uapi/hashkey"
         headers = {
             "content-type": "application/json; charset=UTF-8",
-            "appKey": self._cfg.app_key,
-            "appSecret": self._cfg.app_secret,
+            "appKey": self.config.kis.app_key,
+            "appSecret": self.config.kis.app_secret,
         }
         resp = self._session.post(url, headers=headers, data=json.dumps(body), timeout=7)
         data = resp.json()
@@ -77,25 +72,23 @@ class KisExchange(Exchange):
         headers = {
             "content-type": "application/json; charset=UTF-8",
             "authorization": f"Bearer {token}",
-            "appKey": self._cfg.app_key,
-            "appSecret": self._cfg.app_secret,
+            "appKey": self.config.kis.app_key,
+            "appSecret": self.config.kis.app_secret,
             "tr_id": tr_id,
         }
+        data = None
         if json_body is not None:
             headers["hashkey"] = self._hash_body(json_body)
             data = json.dumps(json_body)
-        else:
-            data = None
         resp = self._session.request(method, url, headers=headers, params=params, data=data, timeout=15)
         if resp.status_code >= 400:
             raise RuntimeError(f"KIS API error {resp.status_code}: {resp.text}")
         return resp.json()
 
     def _order_tr_id(self, side: str) -> str:
-        live = self._is_live()
         if side.lower() == "buy":
-            return "TTTS03010100" if live else "VTTS03010100"
-        return "TTTS03010200" if live else "VTTS03010200"
+            return "TTTS03010100" if self._is_live() else "VTTS03010100"
+        return "TTTS03010200" if self._is_live() else "VTTS03010200"
 
     # ------------------------------------------------------------------
     # Exchange interface
@@ -103,8 +96,8 @@ class KisExchange(Exchange):
     def fetch_quote(self) -> Quote:
         params = {
             "AUTH": "",
-            "EXCD": self._cfg.exchange_code,
-            "SYMB": self._cfg.symbol,
+            "EXCD": self.config.kis.exchange_code,
+            "SYMB": self.config.kis.symbol,
         }
         data = self._request(
             "GET",
@@ -118,15 +111,15 @@ class KisExchange(Exchange):
         return Quote(price=price, volume_24h=volume)
 
     def place_order(self, side: str, price: float, quantity: float) -> OrderResult:
-        if self.config.dry_run:
+        if self.config.bot.dry_run:
             return OrderResult(True, f"dry-{uuid.uuid4().hex[:12]}", {})
         qty_int = int(round(quantity))
         body = {
-            "CANO": self._cfg.account_no,
+            "CANO": self.config.kis.account_no,
             "ACNT_PRDT_CD": "01",
-            "OVRS_EXCG_CD": self._cfg.exchange_code,
-            "PDNO": self._cfg.symbol,
-            "ORD_DVSN": "00",  # limit order
+            "OVRS_EXCG_CD": self.config.kis.exchange_code,
+            "PDNO": self.config.kis.symbol,
+            "ORD_DVSN": "00",
             "OVRS_ORD_UNPR": f"{price:.2f}",
             "ORD_QTY": str(qty_int),
             "ORD_UNPR": "",
@@ -146,13 +139,13 @@ class KisExchange(Exchange):
         return OrderResult(success, order_id, data)
 
     def cancel_order(self, order_id: str, side: str) -> bool:
-        if self.config.dry_run:
+        if self.config.bot.dry_run:
             return True
         body = {
-            "CANO": self._cfg.account_no,
+            "CANO": self.config.kis.account_no,
             "ACNT_PRDT_CD": "01",
-            "OVRS_EXCG_CD": self._cfg.exchange_code,
-            "PDNO": self._cfg.symbol,
+            "OVRS_EXCG_CD": self.config.kis.exchange_code,
+            "PDNO": self.config.kis.symbol,
             "ORD_QTY": "0",
             "ORD_UNPR": "0",
             "RVSE_CNCL_DVSN_CD": "02",
@@ -167,13 +160,13 @@ class KisExchange(Exchange):
         return data.get("rt_cd") == "0"
 
     def list_open_orders(self) -> Iterable[OpenOrder]:
-        if self.config.dry_run:
+        if self.config.bot.dry_run:
             return []
         body = {
-            "CANO": self._cfg.account_no,
+            "CANO": self.config.kis.account_no,
             "ACNT_PRDT_CD": "01",
-            "OVRS_EXCG_CD": self._cfg.exchange_code,
-            "PDNO": self._cfg.symbol,
+            "OVRS_EXCG_CD": self.config.kis.exchange_code,
+            "PDNO": self.config.kis.symbol,
             "CTX_AREA_FK100": "",
             "CTX_AREA_NK100": "",
         }
@@ -201,7 +194,7 @@ class KisExchange(Exchange):
         return round(price, 2)
 
     def round_quantity(self, quantity: float) -> float:
-        lot = max(self._cfg.order_lot_size, 1.0)
+        lot = max(self.config.kis.order_lot_size, 1.0)
         steps = max(1, int(round(quantity / lot)))
         return steps * lot
 
@@ -214,4 +207,7 @@ class KisExchange(Exchange):
         return shares
 
     def is_notional_sufficient(self, notional: float, quantity: float) -> bool:
-        return quantity >= self._cfg.order_lot_size and notional > 0
+        return quantity >= self.config.kis.order_lot_size and notional > 0
+
+
+__all__ = ["KisExchange"]

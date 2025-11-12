@@ -1,258 +1,140 @@
-# Split-Buy Bot Toolkit
+# Multi-Exchange Split-Buy Bot
 
-This repository contains a high-frequency split-buy trading bot that now works
-with multiple exchanges. The default setup targets the Bithumb USDT/KRW market,
-while an optional adapter supports overseas equities via the Korea Investment &
-Securities (KIS) OpenAPI. The toolkit also ships with analytics and
-configuration helpers for long-running Home Assistant deployments.
+A modular trading bot that executes a volatility-aware split-buy strategy on
+Bithumb (crypto) or the Korea Investment & Securities OpenAPI (overseas
+equities).  The project bundles CLI tooling, an HTML report generator, and a
+Home Assistant add-on so that long-running deployments can be monitored without
+leaving the dashboard.
+
+> 📚 New to the codebase? Start with the [project overview](docs/overview.md) and
+> then read the [strategy & environment guide](docs/strategy_guide.md).
 
 ## Features
 
-- Multi-exchange core with adapters for Bithumb spot trading and KIS overseas
-  equities (shares handled in whole-lot increments).
-- High-frequency trading loop that adapts to market volatility using EWMA.
-- CSV logging for fills, errors, and daily summaries in the `data/` directory
-  (one set of files per exchange).
-- Interactive HTML report generator powered by Chart.js (now scheduled and shareable).
-- CLI helper to create or update either the `.env` file or a structured
-  `config/bot_config.yaml`.
-- FastAPI-based gateway that serves the latest HTML report, exposes a config
-  web UI, and streams metrics for Home Assistant.
-- Optional MQTT publisher and JSON metrics file (`data/ha_metrics.json`) for
-  dashboards and automations.
+- **Dual-exchange support** – choose between Bithumb or KIS by switching the
+  `EXCHANGE` environment variable; both share the same strategy core.
+- **Dynamic grid strategy** – EWMA volatility drives take-profit/stop-loss bounds
+  while respecting user-defined floors and martingale-style position sizing.
+- **Robust logging & reporting** – CSV trades/errors/daily summaries in `data/`
+  plus a Chart.js HTML dashboard generated via `tools/generate_report.py`.
+- **Friendly configuration** – interactive wizard (`tools/configure_bot.py`),
+  `.env` / YAML storage, and a FastAPI web form that mirrors the Home Assistant
+  add-on UI.
+- **Home Assistant integration** – optional MQTT metrics, JSON snapshots, and an
+  add-on that clones the repo, installs dependencies with `python -m pip`, and
+  launches the bot + gateway on port `6443`.
 
-## Getting started (English)
+## Quick start (English)
 
-1. (Optional) Create a virtual environment and install dependencies if you plan
-   to extend the project.
-2. Install the required Python packages:
-
+1. **Install dependencies**
    ```bash
    pip install -r requirements.txt
    ```
 
-3. Configure credentials and runtime options:
-
+2. **Create or update `.env`**
    ```bash
-   python tools/configure_bot.py
+   python tools/configure_bot.py --wizard
    ```
+   - Choose the exchange (`BITHUMB` or `KIS`).
+   - Enter API keys / account information when prompted.
+   - The wizard also records strategy values (base order value, buy step, TP/SL).
 
-   - Choose the exchange (`BITHUMB` or `KIS`) when prompted and provide the
-     corresponding credentials.
-   - Use `--set KEY=VALUE` pairs for non-interactive updates.
-   - To generate a YAML config with Home Assistant options, run
-     `python tools/configure_bot.py --yaml` or copy
-     `config/bot_config.example.yaml` to `config/bot_config.yaml` and edit it
-     manually.
-4. Run the bot (defaults to dry-run mode until disabled in the `.env` file):
-
+3. **Run the bot (dry-run by default)**
    ```bash
-   python -m bot.bithumb_bot
+   python -m bot
    ```
+   - Edit `.env` and set `BOT_DRY_RUN=false` only after verifying in simulation.
 
-5. Generate an HTML performance report from the collected CSVs:
-
+4. **Generate a report**
    ```bash
-   python tools/generate_report.py
+   python tools/generate_report.py --output reports/latest.html
    ```
+   Open the resulting HTML file in a browser to inspect trades and daily stats.
 
-   The default output lives in `reports/latest.html`.
-
-6. (Optional) Launch the Home Assistant gateway to auto-refresh reports and expose metrics:
-
+5. **Optional – start the FastAPI gateway**
    ```bash
    uvicorn tools.ha_gateway:app --host 0.0.0.0 --port 6443
    ```
-
-   - Open `http://localhost:6443` to edit `config/bot_config.yaml` through a web form.
-   - `GET /metrics` returns the latest JSON snapshot (`data/ha_metrics.json`) when `rest_api.enabled` is `true`.
-   - `/generate-report` forces an immediate refresh and `/report` serves the latest Chart.js dashboard when
-     `reporting.serve_report` is enabled.
+   - `http://localhost:6443` shows the config form and `.env` contents.
+   - `GET /metrics` returns the latest JSON snapshot for automations.
+   - `POST /generate-report` refreshes the HTML report; `GET /report` serves it
+     when `REPORT_SERVE=true`.
 
 ## 빠르게 시작하기 (한국어)
 
-> 아래 순서는 **초보자**도 그대로 따라 하면 되도록 단계별로 정리했습니다.
-
-1. **파이썬 설치 확인**  
-   Windows는 `cmd`, macOS/Linux는 터미널에서 다음 명령으로 버전을 확인합니다.
-
-   ```bash
-   python --version
-   ```
-
-   3.9 이상이면 됩니다. 없다면 [python.org](https://www.python.org/downloads/)에서 설치하세요.
-
-2. **(선택) 가상환경 만들기**  
-   프로젝트 폴더에서 실행합니다.
-
-   ```bash
-   python -m venv .venv
-   source .venv/bin/activate  # Windows는 .venv\Scripts\activate
-   ```
-
-3. **필수 패키지 설치**
-
+1. **필수 패키지 설치**
    ```bash
    pip install -r requirements.txt
    ```
 
-4. **환경변수(.env) 설정**
-   아래 명령을 실행하면 하나씩 질문이 나오니 순서대로 입력하세요.
-   (이미 .env가 있다면 기존 값이 대괄호로 표시됩니다.)
-
+2. **환경변수 설정 마법사 실행**
    ```bash
-   python tools/configure_bot.py
+   python tools/configure_bot.py --wizard
    ```
+   - 첫 질문에서 거래소(`BITHUMB` 또는 `KIS`)를 고르고 안내에 따라 API 키,
+     계좌번호, 주문 파라미터를 입력합니다.
+   - 입력이 끝나면 `.env`와 `config/bot_config.yaml`이 동시에 갱신됩니다.
 
-   - 첫 번째 질문에서 거래소(`BITHUMB` 또는 `KIS`)를 선택하고 해당 키를
-     입력합니다.
-   - 명령형으로 바로 넣고 싶다면 `python tools/configure_bot.py --set BOT_DRY_RUN=true` 처럼 사용합니다.
-   - 홈어시스턴트 옵션까지 포함한 YAML 설정이 필요하면 `python tools/configure_bot.py --yaml`을 실행하거나
-     `config/bot_config.example.yaml`을 복사해 `config/bot_config.yaml`으로 저장한 뒤 수정하세요.
-
-5. **봇 실행 (기본은 연습 모드)**
-
+3. **봇 실행 (기본은 드라이런)**
    ```bash
-   python -m bot.bithumb_bot
+   python -m bot
    ```
+   - 터미널에 매수/매도 로그가 출력되고, `data/` 폴더에 CSV가 쌓입니다.
+   - 실거래로 전환하려면 `.env`에서 `BOT_DRY_RUN=false`로 바꾼 뒤 다시 실행하세요.
 
-   - 터미널에 매수/매도 시도 로그가 출력됩니다.
-   - `BOT_DRY_RUN`을 `false`로 바꾸기 전까지는 실제 주문이 나가지 않습니다.
-
-6. **CSV 확인**  
-   실행 후 `data/` 폴더에 CSV와 로그가 자동으로 쌓입니다.
-   - `<exchange>_trades.csv`: 매수·매도 내역 (예: `bithumb_trades.csv`)
-   - `<exchange>_daily_summary.csv`: 일별 실현손익
-   - `<exchange>_errors.log`: 에러 메모
-
-7. **리포트 HTML 만들기**
-
+4. **HTML 리포트 생성**
    ```bash
-   python tools/generate_report.py
+   python tools/generate_report.py --output reports/latest.html
    ```
+   - `reports/latest.html`을 브라우저로 열면 누적 손익 그래프와 거래 목록을
+     확인할 수 있습니다.
 
-   실행이 끝나면 `reports/latest.html`이 생성됩니다. 브라우저로 열면 그래프를 볼 수 있습니다.
-
-8. **문제가 생기면**
-   - `data/bithumb_errors.log`를 확인해 원인을 찾습니다.
-   - API 키나 비밀번호가 틀리면 `.env`를 다시 설정합니다.
-   - 네트워크 오류는 잠시 뒤 다시 실행하세요.
-
-9. **(선택) 홈어시스턴트 게이트웨이 실행**
-
+5. **FastAPI 게이트웨이 (선택)**
    ```bash
    uvicorn tools.ha_gateway:app --host 0.0.0.0 --port 6443
    ```
+   - `http://localhost:6443`에서 `.env` 값을 웹 UI로 수정할 수 있습니다.
+   - `/metrics`, `/report`, `/generate-report` 엔드포인트가 자동화 및 대시보드에
+     활용됩니다.
 
-   - `http://localhost:6443`에서 웹 폼으로 `config/bot_config.yaml`을 수정할 수 있습니다.
-   - `rest_api.enabled`가 `true`이면 `/metrics`에서 JSON 지표(`data/ha_metrics.json`)를 가져올 수 있습니다.
-   - `reporting.serve_report`가 `true`이면 `/report`에서 최신 HTML 리포트를 바로 확인하고, `/generate-report`로 즉시 갱신할 수 있습니다.
+## Home Assistant add-on
 
-## Configuration
+1. Home Assistant UI에서 **설정 → 애드온 → 저장소**로 이동하여 커스텀 저장소에
+   `https://github.com/Kanu-Coffee/TEST`를 추가합니다.
+2. **Bithumb/KIS Trading Bot** 애드온을 설치하고 구성 탭에서 안내 문구에 따라
+   각 필드를 채웁니다 (필수/선택 여부가 UI에 표기됩니다).
+3. 애드온을 시작하면 컨테이너가 코드를 클론하고 `python -m pip`으로 패키지를
+   설치한 뒤 `python -m bot`과 FastAPI 게이트웨이를 실행합니다.
+4. 로그 패널에서 `Installing Python dependencies` 이후 오류가 없는지 확인하고,
+   필요 시 `http://homeassistant.local:6443`로 접속해 리포트/지표를 살펴보세요.
 
-All runtime settings are loaded from environment variables. The most important
-ones are listed below. Defaults mirror the HF-tuned parameters from the
-original script.
+## Repository layout
 
-| Variable | Description |
-| --- | --- |
-| `EXCHANGE` | Which adapter to use: `BITHUMB` or `KIS`. |
-| `BITHUMB_API_KEY` / `BITHUMB_API_SECRET` | Bithumb credentials. |
-| `BITHUMB_BASE_URL` / `BITHUMB_AUTH_MODE` | Advanced Bithumb settings. |
-| `KIS_APP_KEY` / `KIS_APP_SECRET` | KIS OpenAPI credentials. |
-| `KIS_ACCOUNT_NO` / `KIS_ACCOUNT_PASSWORD` | KIS account routing information. |
-| `KIS_MODE` | `paper` (default) or `live`. |
-| `KIS_SYMBOL` / `KIS_EXCHANGE_CODE` / `KIS_CURRENCY` | Overseas stock routing fields. |
-| `KIS_ORDER_LOT_SIZE` | Minimum share lot (usually `1`). |
-| `BOT_SYMBOL_TICKER` | Market ticker (Bithumb pair or reference symbol). |
-| `BOT_ORDER_CURRENCY` / `BOT_PAYMENT_CURRENCY` | Used for Bithumb pairs. |
-| `BOT_HF_MODE` / `BOT_DRY_RUN` | Toggle HF parameters and dry-run mode. |
-| `DEFAULT_BASE_ORDER_VALUE` / `HF_BASE_ORDER_VALUE` | Base order sizing per mode (legacy `*_BASE_KRW` still works). |
-| Other `DEFAULT_*` / `HF_*` | Override TP/SL, step size, cooldowns, etc. |
-
-Any value left blank in `.env` falls back to the defaults baked into
-`bot/config.py`.
-
-## Requirements
-
-Install project dependencies with:
-
-```bash
-pip install -r requirements.txt
+```
+bot/            → configuration dataclasses, strategy engine, metrics/log helpers
+exchanges/      → exchange adapters (Bithumb, KIS)
+tools/          → CLI wizard, report generator, FastAPI gateway
+ha-addon/       → Home Assistant add-on definition (Dockerfile + scripts)
+docs/           → reference documentation and strategy guides
 ```
 
-## Data outputs
+## Useful commands
 
-- `data/<exchange>_trades.csv` – detailed log of individual trades and order
-  attempts (e.g. `data/bithumb_trades.csv` or `data/kis_trades.csv`).
-- `data/<exchange>_daily_summary.csv` – aggregated daily performance statistics
-  automatically updated on each filled sell order.
-- `data/<exchange>_errors.log` – diagnostic information for unexpected errors.
+| 목적 | 명령 |
+|------|------|
+| 설정 확인 | `python tools/configure_bot.py --show` |
+| 환경변수 즉시 수정 | `python tools/configure_bot.py --set KEY=VALUE` |
+| 리포트 수동 생성 | `python tools/generate_report.py --output reports/custom.html` |
+| 게이트웨이 실행 | `uvicorn tools.ha_gateway:app --host 0.0.0.0 --port 6443` |
+| 코드 검사 | `python -m compileall bot tools exchanges` |
 
-These files power the HTML report generated via `tools/generate_report.py`.
+## Contributing
 
-## Home Assistant integration
+- 모든 작업은 `codex-dev` 브랜치에서 진행하고 자동 PR 워크플로우가 병합을 담당합니다.
+- PR 설명에는 테스트 결과와 변경 요약을 포함하세요.
+- 중복 코드나 사용하지 않는 파일이 보이면 정리해 주시면 감사하겠습니다.
 
-### Custom add-on repository (전체 과정을 따라 하세요)
+---
 
-1. **애드온 저장소 추가** – Home Assistant 웹 UI에서 *설정 → 애드온 → 애드온 스토어*로 이동한 뒤 오른쪽 상단 메뉴에서 “저장소”를 선택하고 아래 주소를 붙여넣습니다.
-
-   ```text
-   https://github.com/Kanu-Coffee/TEST
-   ```
-
-   이제 “Bithumb/KIS Trading Bot” 애드온이 목록에 나타납니다.
-
-2. **애드온 설치** – `Bithumb/KIS Trading Bot`을 선택해 설치합니다. 이 애드온은 저장소 루트의 `repository.yaml`과 `ha-addon/` 폴더(`config.yaml`, `Dockerfile`, `rootfs/`)를 사용합니다.
-
-3. **옵션 설정** – 설치 후 “구성(Configure)” 화면에 필드별 안내가 한글·영문으로 표시됩니다. 아래 표를 참고해 필수 항목부터 채우세요.
-
-   | 구분 | 필수 값 | 설명 |
-   | --- | --- | --- |
-   | 기본 | `repository_url`, `repository_ref`, `exchange` | 어떤 저장소/브랜치의 코드를 실행할지와 대상 거래소를 정합니다. |
-   | 공통 | `bot_symbol_ticker`, `bot_order_currency`, `bot_payment_currency` | 기본 종목·주문/정산 통화를 지정합니다. 기본값은 빗썸 USDT/KRW 세팅입니다. |
-   | 실행 모드 | `bot_dry_run`, `bot_hf_mode` | 드라이런(연습) 모드를 켜 둔 상태에서 먼저 테스트한 뒤 실거래 시 `bot_dry_run`을 꺼주세요. |
-   | 전략 | `default_*`, `hf_*` 필드 | 기본/고빈도 그리드의 첫 주문 금액, 간격, 마틴배율, 최대 스텝을 조정합니다. (소수 표기: 0.005 = 0.5%) |
-   | 빗썸 선택 시 | `bithumb_api_key`, `bithumb_api_secret` | 실거래하려면 빗썸 API Key/Secret을 반드시 입력하세요. 드라이런 중 비워두면 경고만 출력됩니다. |
-   | KIS 선택 시 | `kis_app_key`, `kis_app_secret`, `kis_account_no`, `kis_account_password` | 한국투자증권 OpenAPI 주문에 필요한 기본 인증 값입니다. `kis_mode`로 모의/실전을 선택하세요. |
-  | 선택 | `kis_exchange_code`, `kis_symbol`, `kis_currency`, `kis_order_lot_size` | KIS 환경에서만 필요합니다. 기본값을 그대로 두거나 원하는 값으로 수정하세요. |
-  | 게이트웨이 | `enable_gateway`, `gateway_port` | 리포트/설정/메트릭을 노출하려면 `enable_gateway`를 `true`로 설정하고, 기본 포트(6443)가 충돌하면 `gateway_port`로 다른 값을 입력하세요. |
-
-  저장 후 컨테이너는 `/data/bot/.env`를 생성해 위 값들을 모두 반영합니다. 각 입력창에는 (필수)/(선택) 표시와 간단한 설명이 함께 노출되므로, 표와 함께 참고해 값을 채워 주세요. 실거래 전에는 `bot_dry_run=true` 상태에서 로그와 리포트를 먼저 확인하세요.
-
-4. **애드온 시작** – “시작(Start)” 버튼을 누르면 컨테이너가 자동으로 아래 작업을 수행합니다.
-
-   - `repository_url`과 `repository_ref`를 기준으로 코드를 `/opt/bot`에 클론하거나 업데이트합니다.
-  - `requirements.txt`를 읽어 필요한 패키지를 설치합니다.
-  - `/data/bot/.env`에 기록된 환경변수를 로드하고 `python3 -m bot.bithumb_bot`을 실행합니다.
-  - `enable_gateway`가 `true`이면 `python3 -m uvicorn tools.ha_gateway:app --host 0.0.0.0 --port 6443` 프로세스를 함께 띄웁니다.
-
-5. **리포트와 상태 확인** – 애드온 로그에서 봇 실행 상황을 확인하고, 게이트웨이를 켰다면 `http://homeassistant.local:6443/report`(또는 ingress)에서 HTML 리포트를 볼 수 있습니다. `/metrics`는 Home Assistant 센서 자동화에 활용할 수 있는 JSON 데이터를 제공합니다.
-
-> 💡 **팁:** 애드온은 `/data`를 지속 저장소로 사용합니다. 필요 시 SSH 애드온이나 Samba를 통해 `config/bot_config.yaml`이나 CSV 로그를 직접 열어볼 수 있습니다.
->
-> 🔄 **문제 해결:** 이전 설치에서 남은 캐시나 오래된 저장소가 원인이라고 의심되면 (1) 애드온을 중지하고 제거한 뒤, (2) *파일 편집기/SSH*로 접속해 `config/bithumb_kis_bot`과 `share/bithumb_kis_bot`(존재한다면)을 삭제하고, (3) Home Assistant를 재부팅한 후 애드온을 다시 설치하세요. 이렇게 하면 `/data/bot`과 관련 임시 파일이 초기화됩니다.
-
-### 직접 실행형 연동
-
-- Run `uvicorn tools.ha_gateway:app --host 0.0.0.0 --port 6443` alongside the bot to:
-  - auto-refresh the latest HTML report based on `home_assistant.reporting.interval_minutes`;
-  - expose `/metrics`, `/generate-report`, `/report`, and `/config` endpoints for dashboards or automations;
-  - edit `config/bot_config.yaml` through a simple web form (ingress friendly).
-- The bot continuously writes a metrics snapshot to `data/ha_metrics.json`. MQTT publishing mirrors the same data to
-  `<base_topic>/<metric>` topics when `home_assistant.mqtt.enabled` is true (default base topic: `bithumb_bot`).
-- The full custom add-on is defined in `ha-addon/`, and the Supervisor metadata lives
-  at the repository root (`repository.yaml`).
-- Generated reports default to `reports/latest.html`; change `home_assistant.reporting.output_path` in YAML if you mount a
-  different volume inside a container.
-
-## Feature proposals
-
-- 멀티 브로커 확장과 Home Assistant 병렬 운용 아이디어는 `docs/feature_request_multi_exchange.md`에서 자세히
-  확인할 수 있습니다. 향후 거래소 인터페이스 분리를 진행할 때 참고 자료로 활용하세요.
-
-## Disclaimer
-
-This project is provided for educational purposes. Trading cryptocurrencies
-involves significant financial risk. Always back-test thoroughly and start with
-a dry-run before deploying with real funds.
+*Happy trading, and always verify with small dry-run positions before exposing
+real capital.*
