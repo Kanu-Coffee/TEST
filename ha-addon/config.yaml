@@ -1,0 +1,81 @@
+name: Bithumb/KIS Trading Bot
+slug: bithumb_kis_bot
+description: Grid trading bot with Bithumb and KIS multi-exchange support plus optional Home Assistant gateway
+version: 0.5.0
+arch:
+  - amd64
+  - aarch64
+startup: application
+boot: auto
+init: false
+panel_icon: mdi:robot
+homeassistant: 2023.12.0
+url: https://github.com/Kanu-Coffee/TEST
+ports:
+  6443/tcp: 6443
+ports_description:
+  6443/tcp: Home Assistant gateway (optional)
+map:
+  - config:rw
+  - share:rw
+options:
+  repository_url: https://github.com/Kanu-Coffee/TEST.git
+  repository_ref: codex-dev
+  exchange: BITHUMB
+  bot_symbol_ticker: USDT_KRW
+  bot_order_currency: USDT
+  bot_payment_currency: KRW
+  bot_dry_run: true
+  bot_hf_mode: true
+  default_base_order_value: 5000
+  default_buy_step: 0.008
+  default_martingale_mul: 1.5
+  default_max_steps: 10
+  hf_base_order_value: 5000
+  hf_buy_step: 0.005
+  hf_martingale_mul: 1.3
+  hf_max_steps: 10
+  bithumb_api_key: ""
+  bithumb_api_secret: ""
+  kis_app_key: ""
+  kis_app_secret: ""
+  kis_account_no: ""
+  kis_account_password: ""
+  kis_mode: paper
+  kis_exchange_code: NASD
+  kis_symbol: TQQQ
+  kis_currency: USD
+  kis_order_lot_size: 1.0
+  enable_gateway: false
+  gateway_port: 6443
+schema:
+  repository_url: str
+  repository_ref: str
+  exchange: list(BITHUMB|KIS)
+  bot_symbol_ticker: str
+  bot_order_currency: str
+  bot_payment_currency: str
+  bot_dry_run: bool
+  bot_hf_mode: bool
+  default_base_order_value: float
+  default_buy_step: float
+  default_martingale_mul: float
+  default_max_steps: int
+  hf_base_order_value: float
+  hf_buy_step: float
+  hf_martingale_mul: float
+  hf_max_steps: int
+  bithumb_api_key: str?
+  bithumb_api_secret: password?
+  kis_app_key: str?
+  kis_app_secret: password?
+  kis_account_no: str?
+  kis_account_password: password?
+  kis_mode: list(paper|live)
+  kis_exchange_code: str?
+  kis_symbol: str?
+  kis_currency: str?
+  kis_order_lot_size: float?
+  enable_gateway: bool
+  gateway_port: int
+watchdog: http://[HOST]:6443/health

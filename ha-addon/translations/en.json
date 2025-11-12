@@ -1,0 +1,128 @@
+{
+    "configuration": {
+        "step": {
+            "user": {
+                "title": "Bithumb/KIS Trading Bot setup",
+                "description": "Fill in the required credentials and strategy parameters before starting the add-on.\n* **Exchange** controls whether the bot connects to Bithumb (crypto) or Korea Investment & Securities (stocks).\n* Fields marked as \"Required\" must contain real values before you disable dry-run mode.",
+                "data": {
+                    "repository_url": {
+                        "title": "Repository URL (Required)",
+                        "description": "Git repository that will be cloned inside the add-on container."
+                    },
+                    "repository_ref": {
+                        "title": "Repository branch or tag (Required)",
+                        "description": "Branch, tag, or commit to checkout after cloning. Defaults to `codex-dev` for the latest features."
+                    },
+                    "exchange": {
+                        "title": "Target exchange (Required)",
+                        "description": "Choose Bithumb for crypto trading or KIS for overseas stock trading via OpenAPI."
+                    },
+                    "bot_symbol_ticker": {
+                        "title": "Market symbol (Required)",
+                        "description": "Default market pair or ticker (e.g. USDT_KRW for Bithumb, TQQQ for KIS)."
+                    },
+                    "bot_order_currency": {
+                        "title": "Order currency (Required)",
+                        "description": "Asset to place orders with (crypto symbol or stock ticker)."
+                    },
+                    "bot_payment_currency": {
+                        "title": "Settlement currency (Required)",
+                        "description": "Quote currency used when calculating price levels (e.g. KRW or USD)."
+                    },
+                    "bot_dry_run": {
+                        "title": "Dry-run mode (Required)",
+                        "description": "Keep this enabled while testing. Disable only after entering valid API keys."
+                    },
+                    "bot_hf_mode": {
+                        "title": "High-frequency mode (Optional)",
+                        "description": "Use the HF parameter set tuned for tighter grids and more frequent fills."
+                    },
+                    "default_base_order_value": {
+                        "title": "Default base order size (KRW/USD, Required)",
+                        "description": "Starting order value for the standard grid set, expressed in the settlement currency."
+                    },
+                    "default_buy_step": {
+                        "title": "Default grid gap (Required)",
+                        "description": "Price gap between grid levels for the standard set (decimal form, 0.008 = 0.8%)."
+                    },
+                    "default_martingale_mul": {
+                        "title": "Default martingale multiplier (Required)",
+                        "description": "Scaling factor applied to each additional buy in the standard grid."
+                    },
+                    "default_max_steps": {
+                        "title": "Default maximum steps (Required)",
+                        "description": "How many ladder entries are allowed for the standard grid."
+                    },
+                    "hf_base_order_value": {
+                        "title": "HF base order size (KRW/USD, Optional)",
+                        "description": "Starting order value for the high-frequency grid set."
+                    },
+                    "hf_buy_step": {
+                        "title": "HF grid gap (Optional)",
+                        "description": "Price gap between grid levels for the HF set (decimal form, 0.005 = 0.5%)."
+                    },
+                    "hf_martingale_mul": {
+                        "title": "HF martingale multiplier (Optional)",
+                        "description": "Scaling factor applied to each additional buy in the HF grid."
+                    },
+                    "hf_max_steps": {
+                        "title": "HF maximum steps (Optional)",
+                        "description": "How many ladder entries are allowed for the HF grid."
+                    },
+                    "bithumb_api_key": {
+                        "title": "Bithumb API key (Required for Bithumb)",
+                        "description": "Enter the personal API key generated in your Bithumb account."
+                    },
+                    "bithumb_api_secret": {
+                        "title": "Bithumb API secret (Required for Bithumb)",
+                        "description": "Enter the matching API secret. Store it securely."
+                    },
+                    "kis_app_key": {
+                        "title": "KIS AppKey (Required for KIS)",
+                        "description": "OpenAPI AppKey issued by Korea Investment & Securities."
+                    },
+                    "kis_app_secret": {
+                        "title": "KIS AppSecret (Required for KIS)",
+                        "description": "OpenAPI AppSecret paired with the AppKey."
+                    },
+                    "kis_account_no": {
+                        "title": "KIS account number (Required for KIS)",
+                        "description": "Full account number without dashes (required for live or paper trading)."
+                    },
+                    "kis_account_password": {
+                        "title": "KIS account password (Required for KIS)",
+                        "description": "Account password for order placement. Required by the OpenAPI."
+                    },
+                    "kis_mode": {
+                        "title": "KIS trading mode (Required for KIS)",
+                        "description": "Select `paper` for the virtual server or `live` for the production endpoint."
+                    },
+                    "kis_exchange_code": {
+                        "title": "KIS exchange code (Optional)",
+                        "description": "Market code used by KIS (e.g. NASD for NASDAQ)."
+                    },
+                    "kis_symbol": {
+                        "title": "KIS target symbol (Optional)",
+                        "description": "Stock or ETF symbol to trade on the selected exchange."
+                    },
+                    "kis_currency": {
+                        "title": "KIS settlement currency (Optional)",
+                        "description": "Currency for quotes and settlement, typically USD for US markets."
+                    },
+                    "kis_order_lot_size": {
+                        "title": "KIS order lot size (Optional)",
+                        "description": "Quantity per order in shares. Fractional values are allowed if permitted."
+                    },
+                    "enable_gateway": {
+                        "title": "Enable Home Assistant gateway (Optional)",
+                        "description": "Expose the optional FastAPI gateway. Default port: 6443."
+                    },
+                    "gateway_port": {
+                        "title": "Gateway port (Optional)",
+                        "description": "TCP port used by the optional FastAPI gateway. Change this only if 6443 conflicts with another service."
+                    }
+                }
+            }
+        }
+    }
+}
