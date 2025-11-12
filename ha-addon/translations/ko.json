@@ -1,0 +1,128 @@
+{
+    "configuration": {
+        "step": {
+            "user": {
+                "title": "\ube57\uc378/KIS \uc790\ub3d9\ub9e4\ub9e4 \ubd07 \uc124\uc815",
+                "description": "\uc560\ub4dc\uc628\uc744 \uc2dc\uc791\ud558\uae30 \uc804\uc5d0 \uc544\ub798 \ud56d\ubaa9\uc744 \uc21c\uc11c\ub300\ub85c \ucc44\uc6cc\uc8fc\uc138\uc694.\n* **\uac70\ub798\uc18c**\ub97c \uc120\ud0dd\ud558\uba74 \ud544\uc694\ud55c \uc778\uc99d \uc815\ubcf4\uac00 \ubb34\uc5c7\uc778\uc9c0 \uc124\uba85\uc774 \ub098\ud0c0\ub0a9\ub2c8\ub2e4.\n* \"\ud544\uc218\"\ub85c \ud45c\uc2dc\ub41c \uac12\uc740 \uc2e4\uac70\ub798(DRY RUN \ud574\uc81c) \uc804\uc5d0 \ubc18\ub4dc\uc2dc \uc785\ub825\ud574\uc57c \ud569\ub2c8\ub2e4.",
+                "data": {
+                    "repository_url": {
+                        "title": "\uc800\uc7a5\uc18c URL (\ud544\uc218)",
+                        "description": "\uc560\ub4dc\uc628 \ucee8\ud14c\uc774\ub108 \uc548\uc5d0 \ud074\ub860\ud560 Git \uc800\uc7a5\uc18c \uc8fc\uc18c\uc785\ub2c8\ub2e4."
+                    },
+                    "repository_ref": {
+                        "title": "\ube0c\ub79c\uce58 \ub610\ub294 \ud0dc\uadf8 (\ud544\uc218)",
+                        "description": "\ud074\ub860 \ud6c4 \uccb4\ud06c\uc544\uc6c3\ud560 \ube0c\ub79c\uce58\u00b7\ud0dc\uadf8\u00b7\ucee4\ubc0b\uc744 \uc9c0\uc815\ud569\ub2c8\ub2e4. \uae30\ubcf8\uac12\uc740 \ucd5c\uc2e0 \uae30\ub2a5\uc744 \ucd94\uc9c4\ud558\ub294 `codex-dev`\uc785\ub2c8\ub2e4."
+                    },
+                    "exchange": {
+                        "title": "\uac70\ub798\uc18c \uc120\ud0dd (\ud544\uc218)",
+                        "description": "\ube57\uc378(\uac00\uc0c1\uc790\uc0b0) \ub610\ub294 \ud55c\uad6d\ud22c\uc790\uc99d\uad8c KIS(\ud574\uc678\uc8fc\uc2dd) \uc911 \ud558\ub098\ub97c \uace0\ub985\ub2c8\ub2e4."
+                    },
+                    "bot_symbol_ticker": {
+                        "title": "\uae30\ubcf8 \uc885\ubaa9 \ucf54\ub4dc (\ud544\uc218)",
+                        "description": "\ube57\uc378 \uc608: USDT_KRW / KIS \uc608: TQQQ \ucc98\ub7fc \uc0ac\uc6a9\ud560 \ud2f0\ucee4\ub97c \uc801\uc2b5\ub2c8\ub2e4."
+                    },
+                    "bot_order_currency": {
+                        "title": "\uc8fc\ubb38 \uc790\uc0b0 (\ud544\uc218)",
+                        "description": "\ub9e4\uc218/\ub9e4\ub3c4\uc5d0 \uc0ac\uc6a9\ud560 \uc790\uc0b0 \ucf54\ub4dc(\ucf54\uc778 \uc2ec\ubcfc \ub610\ub294 \uc8fc\uc2dd \ud2f0\ucee4)\uc785\ub2c8\ub2e4."
+                    },
+                    "bot_payment_currency": {
+                        "title": "\uc815\uc0b0 \ud1b5\ud654 (\ud544\uc218)",
+                        "description": "\uac00\uaca9 \uacc4\uc0b0\uc5d0 \uc0ac\uc6a9\ud558\ub294 \ud1b5\ud654 (\uc608: KRW, USD)."
+                    },
+                    "bot_dry_run": {
+                        "title": "\ub4dc\ub77c\uc774\ub7f0 \ubaa8\ub4dc (\ud544\uc218)",
+                        "description": "\ud14c\uc2a4\ud2b8 \uc911\uc5d0\ub294 \ubc18\ub4dc\uc2dc \ucf1c\ub450\uc138\uc694. \uc2e4\ub9e4\ub9e4 \uc804\ud658 \uc2dc\uc5d0\ub9cc \ud574\uc81c\ud569\ub2c8\ub2e4."
+                    },
+                    "bot_hf_mode": {
+                        "title": "\uace0\ube48\ub3c4 \ubaa8\ub4dc (\uc120\ud0dd)",
+                        "description": "\ub354 \ucd18\ucd18\ud55c \ub9e4\uc218 \uac04\uaca9\uacfc \ube60\ub978 \ub8e8\ud504\ub97c \uc0ac\uc6a9\ud558\ub294 HF \ud30c\ub77c\ubbf8\ud130\ub97c \uc801\uc6a9\ud569\ub2c8\ub2e4."
+                    },
+                    "default_base_order_value": {
+                        "title": "\uae30\ubcf8 \ubaa8\ub4dc 1\ucc28 \uc8fc\ubb38\uae08\uc561 (\ud544\uc218)",
+                        "description": "\uc77c\ubc18 \uadf8\ub9ac\ub4dc \uccab \uc8fc\ubb38 \uae08\uc561 (\uc815\uc0b0 \ud1b5\ud654 \uae30\uc900, KRW \ub610\ub294 USD)."
+                    },
+                    "default_buy_step": {
+                        "title": "\uae30\ubcf8 \ubaa8\ub4dc \uac04\uaca9 (\ud544\uc218)",
+                        "description": "\uc77c\ubc18 \uadf8\ub9ac\ub4dc\uc758 \uac00\uaca9 \uac04\uaca9 (\uc18c\uc218 \ud45c\uae30, 0.008 = 0.8%)."
+                    },
+                    "default_martingale_mul": {
+                        "title": "\uae30\ubcf8 \ubaa8\ub4dc \ub9c8\ud2f4\ubc30\uc728 (\ud544\uc218)",
+                        "description": "\ucd94\uac00 \ub9e4\uc218\ub9c8\ub2e4 \uc8fc\ubb38\uae08\uc561\uc5d0 \uacf1\ud574\uc9c0\ub294 \ubc30\uc218\uc785\ub2c8\ub2e4."
+                    },
+                    "default_max_steps": {
+                        "title": "\uae30\ubcf8 \ubaa8\ub4dc \ucd5c\ub300 \uc2a4\ud15d (\ud544\uc218)",
+                        "description": "\uc77c\ubc18 \uadf8\ub9ac\ub4dc\uc5d0\uc11c \ud5c8\uc6a9\ud560 \ucd5c\ub300 \ub9e4\uc218 \ud69f\uc218\uc785\ub2c8\ub2e4."
+                    },
+                    "hf_base_order_value": {
+                        "title": "HF \ubaa8\ub4dc 1\ucc28 \uc8fc\ubb38\uae08\uc561 (\uc120\ud0dd)",
+                        "description": "\uace0\ube48\ub3c4 \uadf8\ub9ac\ub4dc\uc758 \uccab \uc8fc\ubb38 \uae08\uc561\uc785\ub2c8\ub2e4."
+                    },
+                    "hf_buy_step": {
+                        "title": "HF \ubaa8\ub4dc \uac04\uaca9 (\uc120\ud0dd)",
+                        "description": "\uace0\ube48\ub3c4 \uadf8\ub9ac\ub4dc\uc758 \uac00\uaca9 \uac04\uaca9 (\uc18c\uc218 \ud45c\uae30, 0.005 = 0.5%)."
+                    },
+                    "hf_martingale_mul": {
+                        "title": "HF \ubaa8\ub4dc \ub9c8\ud2f4\ubc30\uc728 (\uc120\ud0dd)",
+                        "description": "\uace0\ube48\ub3c4 \uadf8\ub9ac\ub4dc\uc5d0\uc11c \ucd94\uac00 \ub9e4\uc218\ub9c8\ub2e4 \uc801\uc6a9\ub418\ub294 \ubc30\uc218\uc785\ub2c8\ub2e4."
+                    },
+                    "hf_max_steps": {
+                        "title": "HF \ubaa8\ub4dc \ucd5c\ub300 \uc2a4\ud15d (\uc120\ud0dd)",
+                        "description": "\uace0\ube48\ub3c4 \uadf8\ub9ac\ub4dc\uc5d0\uc11c \ud5c8\uc6a9\ud560 \ucd5c\ub300 \ub9e4\uc218 \ud69f\uc218\uc785\ub2c8\ub2e4."
+                    },
+                    "bithumb_api_key": {
+                        "title": "\ube57\uc378 API Key (\ube57\uc378 \uc120\ud0dd \uc2dc \ud544\uc218)",
+                        "description": "\ube57\uc378 \uacc4\uc815\uc5d0\uc11c \ubc1c\uae09\ubc1b\uc740 \uac1c\uc778 API Key\ub97c \uc785\ub825\ud558\uc138\uc694."
+                    },
+                    "bithumb_api_secret": {
+                        "title": "\ube57\uc378 API Secret (\ube57\uc378 \uc120\ud0dd \uc2dc \ud544\uc218)",
+                        "description": "\uc704 Key\uc640 \uc9dd\uc774 \ub418\ub294 Secret\uc744 \uc548\uc804\ud558\uac8c \uc785\ub825\ud558\uc138\uc694."
+                    },
+                    "kis_app_key": {
+                        "title": "KIS AppKey (KIS \uc120\ud0dd \uc2dc \ud544\uc218)",
+                        "description": "\ud55c\uad6d\ud22c\uc790\uc99d\uad8c OpenAPI\uc5d0\uc11c \ubc1c\uae09\ubc1b\uc740 AppKey\uc785\ub2c8\ub2e4."
+                    },
+                    "kis_app_secret": {
+                        "title": "KIS AppSecret (KIS \uc120\ud0dd \uc2dc \ud544\uc218)",
+                        "description": "AppKey\uc640 \ud55c \uc30d\uc778 AppSecret\uc744 \uc785\ub825\ud569\ub2c8\ub2e4."
+                    },
+                    "kis_account_no": {
+                        "title": "KIS \uacc4\uc88c\ubc88\ud638 (KIS \uc120\ud0dd \uc2dc \ud544\uc218)",
+                        "description": "\ud558\uc774\ud508 \uc5c6\uc774 \uc785\ub825\ud558\uc138\uc694. \ubaa8\uc758\u00b7\uc2e4\uc804 \ubaa8\ub450 \uc8fc\ubb38 \uc2dc \ud544\uc694\ud569\ub2c8\ub2e4."
+                    },
+                    "kis_account_password": {
+                        "title": "KIS \uacc4\uc88c \ube44\ubc00\ubc88\ud638 (KIS \uc120\ud0dd \uc2dc \ud544\uc218)",
+                        "description": "OpenAPI \uc8fc\ubb38\uc5d0 \ud544\uc694\ud55c \ube44\ubc00\ubc88\ud638\uc785\ub2c8\ub2e4."
+                    },
+                    "kis_mode": {
+                        "title": "KIS \uac70\ub798 \ubaa8\ub4dc (KIS \uc120\ud0dd \uc2dc \ud544\uc218)",
+                        "description": "\ubaa8\uc758\ud22c\uc790\ub294 paper, \uc2e4\uc804\uc740 live\ub97c \uc120\ud0dd\ud569\ub2c8\ub2e4."
+                    },
+                    "kis_exchange_code": {
+                        "title": "KIS \uac70\ub798\uc18c \ucf54\ub4dc (\uc120\ud0dd)",
+                        "description": "\uc608) NASD = \ub098\uc2a4\ub2e5. KIS\uc5d0\uc11c \uc694\uad6c\ud558\ub294 \uc2dc\uc7a5 \ucf54\ub4dc\ub97c \uc785\ub825\ud569\ub2c8\ub2e4."
+                    },
+                    "kis_symbol": {
+                        "title": "KIS \uc885\ubaa9 \ucf54\ub4dc (\uc120\ud0dd)",
+                        "description": "\uac70\ub798\ud560 \uc8fc\uc2dd/ETF \uc2ec\ubcfc (\uc608: TQQQ)."
+                    },
+                    "kis_currency": {
+                        "title": "KIS \uc815\uc0b0 \ud1b5\ud654 (\uc120\ud0dd)",
+                        "description": "\ub300\ubd80\ubd84 \ubbf8\uc8fc \uc2dc\uc7a5\uc740 USD\ub97c \uc0ac\uc6a9\ud569\ub2c8\ub2e4."
+                    },
+                    "kis_order_lot_size": {
+                        "title": "KIS \uc8fc\ubb38 \uc218\ub7c9 (\uc120\ud0dd)",
+                        "description": "\uc8fc(share) \ub2e8\uc704 \uc8fc\ubb38 \uc218\ub7c9\uc785\ub2c8\ub2e4. \ud544\uc694 \uc2dc \uc18c\uc218\uc810\ub3c4 \ud5c8\uc6a9\ub429\ub2c8\ub2e4."
+                    },
+                    "enable_gateway": {
+                        "title": "\uac8c\uc774\ud2b8\uc6e8\uc774 \ud65c\uc131\ud654 (\uc120\ud0dd)",
+                        "description": "FastAPI \uac8c\uc774\ud2b8\uc6e8\uc774\ub97c \ub178\ucd9c\ud569\ub2c8\ub2e4. \uae30\ubcf8 \ud3ec\ud2b8: 6443."
+                    },
+                    "gateway_port": {
+                        "title": "\uac8c\uc774\ud2b8\uc6e8\uc774 \ud3ec\ud2b8 (\uc120\ud0dd)",
+                        "description": "FastAPI \uac8c\uc774\ud2b8\uc6e8\uc774\uc5d0 \uc0ac\uc6a9\ud560 TCP \ud3ec\ud2b8\uc785\ub2c8\ub2e4. 6443\uc774 \ub2e4\ub978 \uc11c\ube44\uc2a4\uc640 \ucda9\ub3cc\ud560 \ub54c\ub9cc \ubcc0\uacbd\ud558\uc138\uc694."
+                    }
+                }
+            }
+        }
+    }
+}
