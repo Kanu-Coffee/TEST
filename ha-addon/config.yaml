@@ -1,7 +1,7 @@
 name: Bithumb/KIS Trading Bot
 slug: bithumb_kis_bot
 description: Grid trading bot with Bithumb and KIS multi-exchange support plus optional Home Assistant gateway
-version: 0.5.0
+version: 0.5.1
 arch:
   - amd64
   - aarch64
