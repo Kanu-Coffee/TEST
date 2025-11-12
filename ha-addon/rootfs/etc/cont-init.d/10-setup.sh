@@ -31,6 +31,7 @@ KIS_ORDER_LOT_SIZE="$(bashio::config 'kis_order_lot_size')"
 ENABLE_GATEWAY="$(bashio::config 'enable_gateway')"
 GATEWAY_PORT="$(bashio::config 'gateway_port')"
 
+# sensible defaults
 SYMBOL=${SYMBOL:-USDT_KRW}
 ORDER_CCY=${ORDER_CCY:-USDT}
 PAY_CCY=${PAY_CCY:-KRW}
@@ -51,10 +52,12 @@ KIS_CURRENCY=${KIS_CURRENCY:-USD}
 KIS_ORDER_LOT_SIZE=${KIS_ORDER_LOT_SIZE:-1.0}
 GATEWAY_PORT=${GATEWAY_PORT:-6443}
 
+# ensure PATH covers all base locations (s6 init path bug workaround)
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PATH:-}"
 
 bashio::log.info "Preparing trading bot workspace"
 
+# clone or update repo
 if [ -d "/opt/bot/.git" ]; then
     bashio::log.info "Updating existing repository in /opt/bot"
     git -C /opt/bot remote set-url origin "${REPO_URL}"
@@ -67,63 +70,66 @@ fi
 git -C /opt/bot checkout "${REPO_REF}"
 git -C /opt/bot submodule update --init --recursive
 
+# detect python runtime
 PYTHON_BIN="$(command -v python3 || command -v python || true)"
 if [[ -z "${PYTHON_BIN}" ]]; then
     bashio::log.fatal "Python runtime not found in the container"
     exit 1
 fi
 
+# ---------- pip bootstrap and dependency installation ----------
 if [ -f /opt/bot/requirements.txt ]; then
     bashio::log.info "Installing Python dependencies"
+
+    # try ensurepip first
     if "${PYTHON_BIN}" -m ensurepip --help >/dev/null 2>&1; then
         "${PYTHON_BIN}" -m ensurepip --upgrade || bashio::log.warning "ensurepip upgrade reported an error"
     else
         bashio::log.warning "ensurepip module unavailable; attempting bootstrap via Python"
     fi
 
+    # verify pip module exists
     if ! "${PYTHON_BIN}" -m pip --version >/dev/null 2>&1; then
-        bashio::log.info "Bootstrapping pip module"
+        bashio::log.info "Bootstrapping pip via ensurepip"
         "${PYTHON_BIN}" - <<'PY'
 import ensurepip
 ensurepip.bootstrap(upgrade=True)
 PY
     fi
 
+    # determine usable pip command
     PIP_CMD=()
     if "${PYTHON_BIN}" -m pip --version >/dev/null 2>&1; then
+        # module invocation is always safe in HAOS
         PIP_CMD=("${PYTHON_BIN}" -m pip)
+        bashio::log.info "Using Python module invocation for pip"
+    elif command -v pip3 >/dev/null 2>&1; then
+        PIP_CMD=("$(command -v pip3)")
+        bashio::log.warning "Using fallback pip3 executable: ${PIP_CMD[*]}"
+    elif command -v pip >/dev/null 2>&1; then
+        PIP_CMD=("$(command -v pip)")
+        bashio::log.warning "Using fallback pip executable: ${PIP_CMD[*]}"
     else
-        for candidate in pip pip3; do
-            if command -v "${candidate}" >/dev/null 2>&1; then
-                PIP_CMD=("${candidate}")
-                break
-            fi
-        done
-    fi
-
-    if [ ${#PIP_CMD[@]} -eq 0 ]; then
-        bashio::log.fatal "pip executable is not available even after bootstrapping"
+        bashio::log.fatal "pip executable not found in PATH (${PATH}); aborting"
         exit 1
     fi
 
-    if [[ "${PIP_CMD[0]}" != "${PYTHON_BIN}" ]]; then
-        bashio::log.warning "Using fallback pip executable: ${PIP_CMD[*]}"
-    else
-        bashio::log.info "Using Python module invocation for pip"
-    fi
-
+    # ensure /usr/bin/pip symlink for any later scripts
     if ! command -v pip >/dev/null 2>&1 && command -v pip3 >/dev/null 2>&1; then
-        ln -sf "$(command -v pip3)" /usr/bin/pip
+        ln -sf "$(command -v pip3)" /usr/bin/pip || true
     fi
 
+    # perform installation
     "${PIP_CMD[@]}" install --upgrade pip
     "${PIP_CMD[@]}" install --no-cache-dir -r /opt/bot/requirements.txt
 fi
+# ---------------------------------------------------------------
 
 if bashio::var.true "${DRY_RUN}"; then
     bashio::log.notice "Dry-run mode is enabled. No live orders will be sent."
 fi
 
+# exchange key validation
 if [[ "${EXCHANGE}" == "BITHUMB" ]]; then
     if [[ -z "${BITHUMB_API_KEY}" || -z "${BITHUMB_API_SECRET}" ]]; then
         if bashio::var.true "${DRY_RUN}"; then
@@ -144,6 +150,7 @@ elif [[ "${EXCHANGE}" == "KIS" ]]; then
     fi
 fi
 
+# generate .env
 mkdir -p /data/bot
 ENV_FILE="/data/bot/.env"
 {
