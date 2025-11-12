@@ -1,7 +1,7 @@
 name: Bithumb/KIS Trading Bot
 slug: bithumb_kis_bot
 description: Grid trading bot with Bithumb and KIS multi-exchange support plus optional Home Assistant gateway
-version: 0.1.3
+version: 0.2.0
 arch:
   - amd64
   - aarch64
@@ -12,9 +12,9 @@ panel_icon: mdi:robot
 homeassistant: 2023.12.0
 url: https://github.com/Kanu-Coffee/TEST
 ports:
-  8080/tcp: 8080
+  6443/tcp: 6443
 ports_description:
-  8080/tcp: Home Assistant gateway (optional)
+  6443/tcp: Home Assistant gateway (optional)
 map:
   - config:rw
   - share:rw
@@ -47,6 +47,7 @@ options:
   kis_currency: USD
   kis_order_lot_size: 1.0
   enable_gateway: false
+  gateway_port: 6443
 schema:
   repository_url: str
   repository_ref: str
@@ -76,4 +77,5 @@ schema:
   kis_currency: str?
   kis_order_lot_size: float?
   enable_gateway: bool
-watchdog: http://[HOST]:8080/health
+  gateway_port: int
+watchdog: http://[HOST]:6443/health

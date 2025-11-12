@@ -1,124 +1,128 @@
 {
-  "configuration": {
-    "step": {
-      "user": {
-        "title": "빗썸/KIS 자동매매 봇 설정",
-        "description": "애드온을 시작하기 전에 아래 항목을 순서대로 채워주세요.\n* **거래소**를 선택하면 필요한 인증 정보가 무엇인지 설명이 나타납니다.\n* \"필수\"로 표시된 값은 실거래(DRY RUN 해제) 전에 반드시 입력해야 합니다.",
-        "data": {
-          "repository_url": {
-            "title": "저장소 URL (필수)",
-            "description": "애드온 컨테이너 안에 클론할 Git 저장소 주소입니다."
-          },
-          "repository_ref": {
-            "title": "브랜치 또는 태그 (필수)",
-            "description": "클론 후 체크아웃할 브랜치·태그·커밋을 지정합니다."
-          },
-          "exchange": {
-            "title": "거래소 선택 (필수)",
-            "description": "빗썸(가상자산) 또는 한국투자증권 KIS(해외주식) 중 하나를 고릅니다."
-          },
-          "bot_symbol_ticker": {
-            "title": "기본 종목 코드 (필수)",
-            "description": "빗썸 예: USDT_KRW / KIS 예: TQQQ 처럼 사용할 티커를 적습니다."
-          },
-          "bot_order_currency": {
-            "title": "주문 자산 (필수)",
-            "description": "매수/매도에 사용할 자산 코드(코인 심볼 또는 주식 티커)입니다."
-          },
-          "bot_payment_currency": {
-            "title": "정산 통화 (필수)",
-            "description": "가격 계산에 사용하는 통화 (예: KRW, USD)."
-          },
-          "bot_dry_run": {
-            "title": "드라이런 모드 (필수)",
-            "description": "테스트 중에는 반드시 켜두세요. 실매매 전환 시에만 해제합니다."
-          },
-          "bot_hf_mode": {
-            "title": "고빈도 모드 (선택)",
-            "description": "더 촘촘한 매수 간격과 빠른 루프를 사용하는 HF 파라미터를 적용합니다."
-          },
-          "default_base_order_value": {
-            "title": "기본 모드 1차 주문금액 (필수)",
-            "description": "일반 그리드 첫 주문 금액 (정산 통화 기준, KRW 또는 USD)."
-          },
-          "default_buy_step": {
-            "title": "기본 모드 간격 (필수)",
-            "description": "일반 그리드의 가격 간격 (소수 표기, 0.008 = 0.8%)."
-          },
-          "default_martingale_mul": {
-            "title": "기본 모드 마틴배율 (필수)",
-            "description": "추가 매수마다 주문금액에 곱해지는 배수입니다."
-          },
-          "default_max_steps": {
-            "title": "기본 모드 최대 스텝 (필수)",
-            "description": "일반 그리드에서 허용할 최대 매수 횟수입니다."
-          },
-          "hf_base_order_value": {
-            "title": "HF 모드 1차 주문금액 (선택)",
-            "description": "고빈도 그리드의 첫 주문 금액입니다."
-          },
-          "hf_buy_step": {
-            "title": "HF 모드 간격 (선택)",
-            "description": "고빈도 그리드의 가격 간격 (소수 표기, 0.005 = 0.5%)."
-          },
-          "hf_martingale_mul": {
-            "title": "HF 모드 마틴배율 (선택)",
-            "description": "고빈도 그리드에서 추가 매수마다 적용되는 배수입니다."
-          },
-          "hf_max_steps": {
-            "title": "HF 모드 최대 스텝 (선택)",
-            "description": "고빈도 그리드에서 허용할 최대 매수 횟수입니다."
-          },
-          "bithumb_api_key": {
-            "title": "빗썸 API Key (빗썸 선택 시 필수)",
-            "description": "빗썸 계정에서 발급받은 개인 API Key를 입력하세요."
-          },
-          "bithumb_api_secret": {
-            "title": "빗썸 API Secret (빗썸 선택 시 필수)",
-            "description": "위 Key와 짝이 되는 Secret을 안전하게 입력하세요."
-          },
-          "kis_app_key": {
-            "title": "KIS AppKey (KIS 선택 시 필수)",
-            "description": "한국투자증권 OpenAPI에서 발급받은 AppKey입니다."
-          },
-          "kis_app_secret": {
-            "title": "KIS AppSecret (KIS 선택 시 필수)",
-            "description": "AppKey와 한 쌍인 AppSecret을 입력합니다."
-          },
-          "kis_account_no": {
-            "title": "KIS 계좌번호 (KIS 선택 시 필수)",
-            "description": "하이픈 없이 입력하세요. 모의·실전 모두 주문 시 필요합니다."
-          },
-          "kis_account_password": {
-            "title": "KIS 계좌 비밀번호 (KIS 선택 시 필수)",
-            "description": "OpenAPI 주문에 필요한 비밀번호입니다."
-          },
-          "kis_mode": {
-            "title": "KIS 거래 모드 (KIS 선택 시 필수)",
-            "description": "모의투자는 paper, 실전은 live를 선택합니다."
-          },
-          "kis_exchange_code": {
-            "title": "KIS 거래소 코드 (선택)",
-            "description": "예) NASD = 나스닥. KIS에서 요구하는 시장 코드를 입력합니다."
-          },
-          "kis_symbol": {
-            "title": "KIS 종목 코드 (선택)",
-            "description": "거래할 주식/ETF 심볼 (예: TQQQ)."
-          },
-          "kis_currency": {
-            "title": "KIS 정산 통화 (선택)",
-            "description": "대부분 미주 시장은 USD를 사용합니다."
-          },
-          "kis_order_lot_size": {
-            "title": "KIS 주문 수량 (선택)",
-            "description": "주(share) 단위 주문 수량입니다. 필요 시 소수점도 허용됩니다."
-          },
-          "enable_gateway": {
-            "title": "게이트웨이 활성화 (선택)",
-            "description": "8080 포트에서 FastAPI 게이트웨이(리포트/메트릭)를 열어둡니다."
-          }
+    "configuration": {
+        "step": {
+            "user": {
+                "title": "\ube57\uc378/KIS \uc790\ub3d9\ub9e4\ub9e4 \ubd07 \uc124\uc815",
+                "description": "\uc560\ub4dc\uc628\uc744 \uc2dc\uc791\ud558\uae30 \uc804\uc5d0 \uc544\ub798 \ud56d\ubaa9\uc744 \uc21c\uc11c\ub300\ub85c \ucc44\uc6cc\uc8fc\uc138\uc694.\n* **\uac70\ub798\uc18c**\ub97c \uc120\ud0dd\ud558\uba74 \ud544\uc694\ud55c \uc778\uc99d \uc815\ubcf4\uac00 \ubb34\uc5c7\uc778\uc9c0 \uc124\uba85\uc774 \ub098\ud0c0\ub0a9\ub2c8\ub2e4.\n* \"\ud544\uc218\"\ub85c \ud45c\uc2dc\ub41c \uac12\uc740 \uc2e4\uac70\ub798(DRY RUN \ud574\uc81c) \uc804\uc5d0 \ubc18\ub4dc\uc2dc \uc785\ub825\ud574\uc57c \ud569\ub2c8\ub2e4.",
+                "data": {
+                    "repository_url": {
+                        "title": "\uc800\uc7a5\uc18c URL (\ud544\uc218)",
+                        "description": "\uc560\ub4dc\uc628 \ucee8\ud14c\uc774\ub108 \uc548\uc5d0 \ud074\ub860\ud560 Git \uc800\uc7a5\uc18c \uc8fc\uc18c\uc785\ub2c8\ub2e4."
+                    },
+                    "repository_ref": {
+                        "title": "\ube0c\ub79c\uce58 \ub610\ub294 \ud0dc\uadf8 (\ud544\uc218)",
+                        "description": "\ud074\ub860 \ud6c4 \uccb4\ud06c\uc544\uc6c3\ud560 \ube0c\ub79c\uce58\u00b7\ud0dc\uadf8\u00b7\ucee4\ubc0b\uc744 \uc9c0\uc815\ud569\ub2c8\ub2e4."
+                    },
+                    "exchange": {
+                        "title": "\uac70\ub798\uc18c \uc120\ud0dd (\ud544\uc218)",
+                        "description": "\ube57\uc378(\uac00\uc0c1\uc790\uc0b0) \ub610\ub294 \ud55c\uad6d\ud22c\uc790\uc99d\uad8c KIS(\ud574\uc678\uc8fc\uc2dd) \uc911 \ud558\ub098\ub97c \uace0\ub985\ub2c8\ub2e4."
+                    },
+                    "bot_symbol_ticker": {
+                        "title": "\uae30\ubcf8 \uc885\ubaa9 \ucf54\ub4dc (\ud544\uc218)",
+                        "description": "\ube57\uc378 \uc608: USDT_KRW / KIS \uc608: TQQQ \ucc98\ub7fc \uc0ac\uc6a9\ud560 \ud2f0\ucee4\ub97c \uc801\uc2b5\ub2c8\ub2e4."
+                    },
+                    "bot_order_currency": {
+                        "title": "\uc8fc\ubb38 \uc790\uc0b0 (\ud544\uc218)",
+                        "description": "\ub9e4\uc218/\ub9e4\ub3c4\uc5d0 \uc0ac\uc6a9\ud560 \uc790\uc0b0 \ucf54\ub4dc(\ucf54\uc778 \uc2ec\ubcfc \ub610\ub294 \uc8fc\uc2dd \ud2f0\ucee4)\uc785\ub2c8\ub2e4."
+                    },
+                    "bot_payment_currency": {
+                        "title": "\uc815\uc0b0 \ud1b5\ud654 (\ud544\uc218)",
+                        "description": "\uac00\uaca9 \uacc4\uc0b0\uc5d0 \uc0ac\uc6a9\ud558\ub294 \ud1b5\ud654 (\uc608: KRW, USD)."
+                    },
+                    "bot_dry_run": {
+                        "title": "\ub4dc\ub77c\uc774\ub7f0 \ubaa8\ub4dc (\ud544\uc218)",
+                        "description": "\ud14c\uc2a4\ud2b8 \uc911\uc5d0\ub294 \ubc18\ub4dc\uc2dc \ucf1c\ub450\uc138\uc694. \uc2e4\ub9e4\ub9e4 \uc804\ud658 \uc2dc\uc5d0\ub9cc \ud574\uc81c\ud569\ub2c8\ub2e4."
+                    },
+                    "bot_hf_mode": {
+                        "title": "\uace0\ube48\ub3c4 \ubaa8\ub4dc (\uc120\ud0dd)",
+                        "description": "\ub354 \ucd18\ucd18\ud55c \ub9e4\uc218 \uac04\uaca9\uacfc \ube60\ub978 \ub8e8\ud504\ub97c \uc0ac\uc6a9\ud558\ub294 HF \ud30c\ub77c\ubbf8\ud130\ub97c \uc801\uc6a9\ud569\ub2c8\ub2e4."
+                    },
+                    "default_base_order_value": {
+                        "title": "\uae30\ubcf8 \ubaa8\ub4dc 1\ucc28 \uc8fc\ubb38\uae08\uc561 (\ud544\uc218)",
+                        "description": "\uc77c\ubc18 \uadf8\ub9ac\ub4dc \uccab \uc8fc\ubb38 \uae08\uc561 (\uc815\uc0b0 \ud1b5\ud654 \uae30\uc900, KRW \ub610\ub294 USD)."
+                    },
+                    "default_buy_step": {
+                        "title": "\uae30\ubcf8 \ubaa8\ub4dc \uac04\uaca9 (\ud544\uc218)",
+                        "description": "\uc77c\ubc18 \uadf8\ub9ac\ub4dc\uc758 \uac00\uaca9 \uac04\uaca9 (\uc18c\uc218 \ud45c\uae30, 0.008 = 0.8%)."
+                    },
+                    "default_martingale_mul": {
+                        "title": "\uae30\ubcf8 \ubaa8\ub4dc \ub9c8\ud2f4\ubc30\uc728 (\ud544\uc218)",
+                        "description": "\ucd94\uac00 \ub9e4\uc218\ub9c8\ub2e4 \uc8fc\ubb38\uae08\uc561\uc5d0 \uacf1\ud574\uc9c0\ub294 \ubc30\uc218\uc785\ub2c8\ub2e4."
+                    },
+                    "default_max_steps": {
+                        "title": "\uae30\ubcf8 \ubaa8\ub4dc \ucd5c\ub300 \uc2a4\ud15d (\ud544\uc218)",
+                        "description": "\uc77c\ubc18 \uadf8\ub9ac\ub4dc\uc5d0\uc11c \ud5c8\uc6a9\ud560 \ucd5c\ub300 \ub9e4\uc218 \ud69f\uc218\uc785\ub2c8\ub2e4."
+                    },
+                    "hf_base_order_value": {
+                        "title": "HF \ubaa8\ub4dc 1\ucc28 \uc8fc\ubb38\uae08\uc561 (\uc120\ud0dd)",
+                        "description": "\uace0\ube48\ub3c4 \uadf8\ub9ac\ub4dc\uc758 \uccab \uc8fc\ubb38 \uae08\uc561\uc785\ub2c8\ub2e4."
+                    },
+                    "hf_buy_step": {
+                        "title": "HF \ubaa8\ub4dc \uac04\uaca9 (\uc120\ud0dd)",
+                        "description": "\uace0\ube48\ub3c4 \uadf8\ub9ac\ub4dc\uc758 \uac00\uaca9 \uac04\uaca9 (\uc18c\uc218 \ud45c\uae30, 0.005 = 0.5%)."
+                    },
+                    "hf_martingale_mul": {
+                        "title": "HF \ubaa8\ub4dc \ub9c8\ud2f4\ubc30\uc728 (\uc120\ud0dd)",
+                        "description": "\uace0\ube48\ub3c4 \uadf8\ub9ac\ub4dc\uc5d0\uc11c \ucd94\uac00 \ub9e4\uc218\ub9c8\ub2e4 \uc801\uc6a9\ub418\ub294 \ubc30\uc218\uc785\ub2c8\ub2e4."
+                    },
+                    "hf_max_steps": {
+                        "title": "HF \ubaa8\ub4dc \ucd5c\ub300 \uc2a4\ud15d (\uc120\ud0dd)",
+                        "description": "\uace0\ube48\ub3c4 \uadf8\ub9ac\ub4dc\uc5d0\uc11c \ud5c8\uc6a9\ud560 \ucd5c\ub300 \ub9e4\uc218 \ud69f\uc218\uc785\ub2c8\ub2e4."
+                    },
+                    "bithumb_api_key": {
+                        "title": "\ube57\uc378 API Key (\ube57\uc378 \uc120\ud0dd \uc2dc \ud544\uc218)",
+                        "description": "\ube57\uc378 \uacc4\uc815\uc5d0\uc11c \ubc1c\uae09\ubc1b\uc740 \uac1c\uc778 API Key\ub97c \uc785\ub825\ud558\uc138\uc694."
+                    },
+                    "bithumb_api_secret": {
+                        "title": "\ube57\uc378 API Secret (\ube57\uc378 \uc120\ud0dd \uc2dc \ud544\uc218)",
+                        "description": "\uc704 Key\uc640 \uc9dd\uc774 \ub418\ub294 Secret\uc744 \uc548\uc804\ud558\uac8c \uc785\ub825\ud558\uc138\uc694."
+                    },
+                    "kis_app_key": {
+                        "title": "KIS AppKey (KIS \uc120\ud0dd \uc2dc \ud544\uc218)",
+                        "description": "\ud55c\uad6d\ud22c\uc790\uc99d\uad8c OpenAPI\uc5d0\uc11c \ubc1c\uae09\ubc1b\uc740 AppKey\uc785\ub2c8\ub2e4."
+                    },
+                    "kis_app_secret": {
+                        "title": "KIS AppSecret (KIS \uc120\ud0dd \uc2dc \ud544\uc218)",
+                        "description": "AppKey\uc640 \ud55c \uc30d\uc778 AppSecret\uc744 \uc785\ub825\ud569\ub2c8\ub2e4."
+                    },
+                    "kis_account_no": {
+                        "title": "KIS \uacc4\uc88c\ubc88\ud638 (KIS \uc120\ud0dd \uc2dc \ud544\uc218)",
+                        "description": "\ud558\uc774\ud508 \uc5c6\uc774 \uc785\ub825\ud558\uc138\uc694. \ubaa8\uc758\u00b7\uc2e4\uc804 \ubaa8\ub450 \uc8fc\ubb38 \uc2dc \ud544\uc694\ud569\ub2c8\ub2e4."
+                    },
+                    "kis_account_password": {
+                        "title": "KIS \uacc4\uc88c \ube44\ubc00\ubc88\ud638 (KIS \uc120\ud0dd \uc2dc \ud544\uc218)",
+                        "description": "OpenAPI \uc8fc\ubb38\uc5d0 \ud544\uc694\ud55c \ube44\ubc00\ubc88\ud638\uc785\ub2c8\ub2e4."
+                    },
+                    "kis_mode": {
+                        "title": "KIS \uac70\ub798 \ubaa8\ub4dc (KIS \uc120\ud0dd \uc2dc \ud544\uc218)",
+                        "description": "\ubaa8\uc758\ud22c\uc790\ub294 paper, \uc2e4\uc804\uc740 live\ub97c \uc120\ud0dd\ud569\ub2c8\ub2e4."
+                    },
+                    "kis_exchange_code": {
+                        "title": "KIS \uac70\ub798\uc18c \ucf54\ub4dc (\uc120\ud0dd)",
+                        "description": "\uc608) NASD = \ub098\uc2a4\ub2e5. KIS\uc5d0\uc11c \uc694\uad6c\ud558\ub294 \uc2dc\uc7a5 \ucf54\ub4dc\ub97c \uc785\ub825\ud569\ub2c8\ub2e4."
+                    },
+                    "kis_symbol": {
+                        "title": "KIS \uc885\ubaa9 \ucf54\ub4dc (\uc120\ud0dd)",
+                        "description": "\uac70\ub798\ud560 \uc8fc\uc2dd/ETF \uc2ec\ubcfc (\uc608: TQQQ)."
+                    },
+                    "kis_currency": {
+                        "title": "KIS \uc815\uc0b0 \ud1b5\ud654 (\uc120\ud0dd)",
+                        "description": "\ub300\ubd80\ubd84 \ubbf8\uc8fc \uc2dc\uc7a5\uc740 USD\ub97c \uc0ac\uc6a9\ud569\ub2c8\ub2e4."
+                    },
+                    "kis_order_lot_size": {
+                        "title": "KIS \uc8fc\ubb38 \uc218\ub7c9 (\uc120\ud0dd)",
+                        "description": "\uc8fc(share) \ub2e8\uc704 \uc8fc\ubb38 \uc218\ub7c9\uc785\ub2c8\ub2e4. \ud544\uc694 \uc2dc \uc18c\uc218\uc810\ub3c4 \ud5c8\uc6a9\ub429\ub2c8\ub2e4."
+                    },
+                    "enable_gateway": {
+                        "title": "\uac8c\uc774\ud2b8\uc6e8\uc774 \ud65c\uc131\ud654 (\uc120\ud0dd)",
+                        "description": "FastAPI \uac8c\uc774\ud2b8\uc6e8\uc774\ub97c \ub178\ucd9c\ud569\ub2c8\ub2e4. \uae30\ubcf8 \ud3ec\ud2b8: 6443."
+                    },
+                    "gateway_port": {
+                        "title": "\uac8c\uc774\ud2b8\uc6e8\uc774 \ud3ec\ud2b8 (\uc120\ud0dd)",
+                        "description": "FastAPI \uac8c\uc774\ud2b8\uc6e8\uc774\uc5d0 \uc0ac\uc6a9\ud560 TCP \ud3ec\ud2b8\uc785\ub2c8\ub2e4. 6443\uc774 \ub2e4\ub978 \uc11c\ube44\uc2a4\uc640 \ucda9\ub3cc\ud560 \ub54c\ub9cc \ubcc0\uacbd\ud558\uc138\uc694."
+                    }
+                }
+            }
         }
-      }
     }
-  }
 }

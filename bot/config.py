@@ -194,7 +194,7 @@ class ReportingConfig:
     interval_minutes: int = 60
     serve_report: bool = False
     host: str = "0.0.0.0"
-    port: int = 8080
+    port: int = 6443
     ingress_path: str = "/"
     output_path: str = "reports/latest.html"
 
@@ -203,7 +203,7 @@ class ReportingConfig:
 class RestAPIConfig:
     enabled: bool = False
     host: str = "0.0.0.0"
-    port: int = 8080
+    port: int = 6443
 
 
 @dataclass

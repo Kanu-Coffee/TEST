@@ -29,6 +29,7 @@ KIS_SYMBOL="$(bashio::config 'kis_symbol')"
 KIS_CURRENCY="$(bashio::config 'kis_currency')"
 KIS_ORDER_LOT_SIZE="$(bashio::config 'kis_order_lot_size')"
 ENABLE_GATEWAY="$(bashio::config 'enable_gateway')"
+GATEWAY_PORT="$(bashio::config 'gateway_port')"
 
 SYMBOL=${SYMBOL:-USDT_KRW}
 ORDER_CCY=${ORDER_CCY:-USDT}
@@ -48,6 +49,7 @@ KIS_EXCHANGE_CODE=${KIS_EXCHANGE_CODE:-NASD}
 KIS_SYMBOL=${KIS_SYMBOL:-TQQQ}
 KIS_CURRENCY=${KIS_CURRENCY:-USD}
 KIS_ORDER_LOT_SIZE=${KIS_ORDER_LOT_SIZE:-1.0}
+GATEWAY_PORT=${GATEWAY_PORT:-6443}
 
 bashio::log.info "Preparing trading bot workspace"
 
@@ -63,11 +65,35 @@ fi
 git -C /opt/bot checkout "${REPO_REF}"
 git -C /opt/bot submodule update --init --recursive
 
+PYTHON_BIN="$(command -v python3 || command -v python || true)"
+if [[ -z "${PYTHON_BIN}" ]]; then
+    bashio::log.fatal "Python runtime not found in the container"
+    exit 1
+fi
+
 if [ -f /opt/bot/requirements.txt ]; then
     bashio::log.info "Installing Python dependencies"
-    python3 -m ensurepip --upgrade >/dev/null 2>&1 || true
-    python3 -m pip install --upgrade pip >/dev/null
-    python3 -m pip install -r /opt/bot/requirements.txt
+    if "${PYTHON_BIN}" -m ensurepip --help >/dev/null 2>&1; then
+        "${PYTHON_BIN}" -m ensurepip --upgrade || bashio::log.warning "ensurepip upgrade reported an error"
+    else
+        bashio::log.warning "ensurepip module unavailable; attempting bootstrap via Python"
+    fi
+
+    if ! "${PYTHON_BIN}" -m pip --version >/dev/null 2>&1; then
+        bashio::log.info "Bootstrapping pip module"
+        "${PYTHON_BIN}" - <<'PY'
+import ensurepip
+ensurepip.bootstrap(upgrade=True)
+PY
+    fi
+
+    if ! "${PYTHON_BIN}" -m pip --version >/dev/null 2>&1; then
+        bashio::log.fatal "pip module is not available even after bootstrapping"
+        exit 1
+    fi
+
+    "${PYTHON_BIN}" -m pip install --upgrade pip
+    "${PYTHON_BIN}" -m pip install --no-cache-dir -r /opt/bot/requirements.txt
 fi
 
 if bashio::var.true "${DRY_RUN}"; then
@@ -127,5 +153,6 @@ ENV_FILE="/data/bot/.env"
 } > "${ENV_FILE}"
 
 echo "ENABLE_GATEWAY=${ENABLE_GATEWAY}" > /var/run/ha_bot_enable_gateway
+echo "${GATEWAY_PORT}" > /var/run/ha_bot_gateway_port
 
 bashio::log.info "Environment prepared"

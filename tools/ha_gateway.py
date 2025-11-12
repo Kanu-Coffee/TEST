@@ -294,7 +294,7 @@ def _build_form(config: Dict[str, Any]) -> str:
                         <input type="text" name="reporting.host" value="{reporting.get('host', '0.0.0.0')}" />
                     </label>
                     <label>Port
-                        <input type="number" name="reporting.port" value="{reporting.get('port', 8080)}" />
+                        <input type="number" name="reporting.port" value="{reporting.get('port', 6443)}" />
                     </label>
                     <label>Ingress path
                         <input type="text" name="reporting.ingress_path" value="{reporting.get('ingress_path', '/bithumb-bot')}" />
@@ -314,7 +314,7 @@ def _build_form(config: Dict[str, Any]) -> str:
                         <input type="text" name="rest_api.host" value="{rest_api.get('host', '0.0.0.0')}" />
                     </label>
                     <label>Port
-                        <input type="number" name="rest_api.port" value="{rest_api.get('port', 8080)}" />
+                        <input type="number" name="rest_api.port" value="{rest_api.get('port', 6443)}" />
                     </label>
                 </div>
             </fieldset>

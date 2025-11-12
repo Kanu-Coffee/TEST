@@ -87,11 +87,11 @@ home_assistant:
     interval_minutes: 60          # 리포트 갱신 주기 (분)
     serve_report: true            # HTTP로 리포트 제공 여부
     host: 0.0.0.0                 # FastAPI 바인드 주소
-    port: 8080                    # FastAPI 포트
+    port: 6443                    # FastAPI 기본 포트
     ingress_path: /bot-dashboard  # HA ingress 경로 (옵션)
     output_path: reports/latest.html
 
   rest_api:
     enabled: true                 # /metrics JSON 엔드포인트 제공 여부
     host: 0.0.0.0
-    port: 8080                    # reporting.port와 동일 포트를 권장
+    port: 6443                    # reporting.port와 동일 포트를 권장

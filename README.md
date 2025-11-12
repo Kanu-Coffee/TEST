@@ -61,10 +61,10 @@ configuration helpers for long-running Home Assistant deployments.
 6. (Optional) Launch the Home Assistant gateway to auto-refresh reports and expose metrics:
 
    ```bash
-   uvicorn tools.ha_gateway:app --host 0.0.0.0 --port 8080
+   uvicorn tools.ha_gateway:app --host 0.0.0.0 --port 6443
    ```
 
-   - Open `http://localhost:8080` to edit `config/bot_config.yaml` through a web form.
+   - Open `http://localhost:6443` to edit `config/bot_config.yaml` through a web form.
    - `GET /metrics` returns the latest JSON snapshot (`data/ha_metrics.json`) when `rest_api.enabled` is `true`.
    - `/generate-report` forces an immediate refresh and `/report` serves the latest Chart.js dashboard when
      `reporting.serve_report` is enabled.
@@ -141,10 +141,10 @@ configuration helpers for long-running Home Assistant deployments.
 9. **(선택) 홈어시스턴트 게이트웨이 실행**
 
    ```bash
-   uvicorn tools.ha_gateway:app --host 0.0.0.0 --port 8080
+   uvicorn tools.ha_gateway:app --host 0.0.0.0 --port 6443
    ```
 
-   - `http://localhost:8080`에서 웹 폼으로 `config/bot_config.yaml`을 수정할 수 있습니다.
+   - `http://localhost:6443`에서 웹 폼으로 `config/bot_config.yaml`을 수정할 수 있습니다.
    - `rest_api.enabled`가 `true`이면 `/metrics`에서 JSON 지표(`data/ha_metrics.json`)를 가져올 수 있습니다.
    - `reporting.serve_report`가 `true`이면 `/report`에서 최신 HTML 리포트를 바로 확인하고, `/generate-report`로 즉시 갱신할 수 있습니다.
 
@@ -216,7 +216,7 @@ These files power the HTML report generated via `tools/generate_report.py`.
    | 빗썸 선택 시 | `bithumb_api_key`, `bithumb_api_secret` | 실거래하려면 빗썸 API Key/Secret을 반드시 입력하세요. 드라이런 중 비워두면 경고만 출력됩니다. |
    | KIS 선택 시 | `kis_app_key`, `kis_app_secret`, `kis_account_no`, `kis_account_password` | 한국투자증권 OpenAPI 주문에 필요한 기본 인증 값입니다. `kis_mode`로 모의/실전을 선택하세요. |
   | 선택 | `kis_exchange_code`, `kis_symbol`, `kis_currency`, `kis_order_lot_size` | KIS 환경에서만 필요합니다. 기본값을 그대로 두거나 원하는 값으로 수정하세요. |
-  | 게이트웨이 | `enable_gateway` | 리포트/설정/메트릭을 8080 포트로 노출하려면 `true`로 변경합니다. |
+  | 게이트웨이 | `enable_gateway`, `gateway_port` | 리포트/설정/메트릭을 노출하려면 `enable_gateway`를 `true`로 설정하고, 기본 포트(6443)가 충돌하면 `gateway_port`로 다른 값을 입력하세요. |
 
   저장 후 컨테이너는 `/data/bot/.env`를 생성해 위 값들을 모두 반영합니다. 각 입력창에는 (필수)/(선택) 표시와 간단한 설명이 함께 노출되므로, 표와 함께 참고해 값을 채워 주세요. 실거래 전에는 `bot_dry_run=true` 상태에서 로그와 리포트를 먼저 확인하세요.
 
@@ -224,16 +224,16 @@ These files power the HTML report generated via `tools/generate_report.py`.
 
    - `repository_url`과 `repository_ref`를 기준으로 코드를 `/opt/bot`에 클론하거나 업데이트합니다.
    - `requirements.txt`를 읽어 필요한 패키지를 설치합니다.
-   - `/data/bot/.env`에 기록된 환경변수를 로드하고 `python -m bot.bithumb_bot`을 실행합니다.
-   - `enable_gateway`가 `true`이면 `python -m tools.ha_gateway --host 0.0.0.0 --port 8080`을 함께 띄웁니다.
+  - `/data/bot/.env`에 기록된 환경변수를 로드하고 `python3 -m bot.bithumb_bot`을 실행합니다.
+  - `enable_gateway`가 `true`이면 `python3 -m tools.ha_gateway --host 0.0.0.0 --port 6443`을 함께 띄웁니다.
 
-5. **리포트와 상태 확인** – 애드온 로그에서 봇 실행 상황을 확인하고, 게이트웨이를 켰다면 `http://homeassistant.local:8080/report`(또는 ingress)에서 HTML 리포트를 볼 수 있습니다. `/metrics`는 Home Assistant 센서 자동화에 활용할 수 있는 JSON 데이터를 제공합니다.
+5. **리포트와 상태 확인** – 애드온 로그에서 봇 실행 상황을 확인하고, 게이트웨이를 켰다면 `http://homeassistant.local:6443/report`(또는 ingress)에서 HTML 리포트를 볼 수 있습니다. `/metrics`는 Home Assistant 센서 자동화에 활용할 수 있는 JSON 데이터를 제공합니다.
 
 > 💡 **팁:** 애드온은 `/data`를 지속 저장소로 사용합니다. 필요 시 SSH 애드온이나 Samba를 통해 `config/bot_config.yaml`이나 CSV 로그를 직접 열어볼 수 있습니다.
 
 ### 직접 실행형 연동
 
-- Run `uvicorn tools.ha_gateway:app --host 0.0.0.0 --port 8080` alongside the bot to:
+- Run `uvicorn tools.ha_gateway:app --host 0.0.0.0 --port 6443` alongside the bot to:
   - auto-refresh the latest HTML report based on `home_assistant.reporting.interval_minutes`;
   - expose `/metrics`, `/generate-report`, `/report`, and `/config` endpoints for dashboards or automations;
   - edit `config/bot_config.yaml` through a simple web form (ingress friendly).
