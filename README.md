@@ -223,13 +223,15 @@ These files power the HTML report generated via `tools/generate_report.py`.
 4. **애드온 시작** – “시작(Start)” 버튼을 누르면 컨테이너가 자동으로 아래 작업을 수행합니다.
 
    - `repository_url`과 `repository_ref`를 기준으로 코드를 `/opt/bot`에 클론하거나 업데이트합니다.
-   - `requirements.txt`를 읽어 필요한 패키지를 설치합니다.
+  - `requirements.txt`를 읽어 필요한 패키지를 설치합니다.
   - `/data/bot/.env`에 기록된 환경변수를 로드하고 `python3 -m bot.bithumb_bot`을 실행합니다.
-  - `enable_gateway`가 `true`이면 `python3 -m tools.ha_gateway --host 0.0.0.0 --port 6443`을 함께 띄웁니다.
+  - `enable_gateway`가 `true`이면 `python3 -m uvicorn tools.ha_gateway:app --host 0.0.0.0 --port 6443` 프로세스를 함께 띄웁니다.
 
 5. **리포트와 상태 확인** – 애드온 로그에서 봇 실행 상황을 확인하고, 게이트웨이를 켰다면 `http://homeassistant.local:6443/report`(또는 ingress)에서 HTML 리포트를 볼 수 있습니다. `/metrics`는 Home Assistant 센서 자동화에 활용할 수 있는 JSON 데이터를 제공합니다.
 
 > 💡 **팁:** 애드온은 `/data`를 지속 저장소로 사용합니다. 필요 시 SSH 애드온이나 Samba를 통해 `config/bot_config.yaml`이나 CSV 로그를 직접 열어볼 수 있습니다.
+>
+> 🔄 **문제 해결:** 이전 설치에서 남은 캐시나 오래된 저장소가 원인이라고 의심되면 (1) 애드온을 중지하고 제거한 뒤, (2) *파일 편집기/SSH*로 접속해 `config/bithumb_kis_bot`과 `share/bithumb_kis_bot`(존재한다면)을 삭제하고, (3) Home Assistant를 재부팅한 후 애드온을 다시 설치하세요. 이렇게 하면 `/data/bot`과 관련 임시 파일이 초기화됩니다.
 
 ### 직접 실행형 연동
 

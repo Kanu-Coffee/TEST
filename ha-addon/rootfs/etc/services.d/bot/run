@@ -12,7 +12,7 @@ fi
 if [ -f /var/run/ha_bot_enable_gateway ] && grep -qi "true" /var/run/ha_bot_enable_gateway; then
     PORT="$(cat /var/run/ha_bot_gateway_port 2>/dev/null || echo 6443)"
     bashio::log.info "Starting Home Assistant gateway on port ${PORT}"
-    python3 -m tools.ha_gateway --host 0.0.0.0 --port "${PORT}" &
+    python3 -m uvicorn tools.ha_gateway:app --host 0.0.0.0 --port "${PORT}" --workers 1 --log-level info &
 fi
 
 bashio::log.info "Starting trading bot"

@@ -71,6 +71,8 @@ if [[ -z "${PYTHON_BIN}" ]]; then
     exit 1
 fi
 
+PIP_CMD=("${PYTHON_BIN}" -m pip)
+
 if [ -f /opt/bot/requirements.txt ]; then
     bashio::log.info "Installing Python dependencies"
     if "${PYTHON_BIN}" -m ensurepip --help >/dev/null 2>&1; then
@@ -92,8 +94,8 @@ PY
         exit 1
     fi
 
-    "${PYTHON_BIN}" -m pip install --upgrade pip
-    "${PYTHON_BIN}" -m pip install --no-cache-dir -r /opt/bot/requirements.txt
+    "${PIP_CMD[@]}" install --upgrade pip
+    "${PIP_CMD[@]}" install --no-cache-dir -r /opt/bot/requirements.txt
 fi
 
 if bashio::var.true "${DRY_RUN}"; then

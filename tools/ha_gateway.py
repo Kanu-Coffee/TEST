@@ -384,3 +384,30 @@ async def update_config(request: Request) -> RedirectResponse:
 @app.get("/config/json")
 async def config_json() -> JSONResponse:
     return JSONResponse(config_to_yaml_dict(app.state.config))
+
+
+def _parse_args(argv: list[str] | None = None) -> Any:
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Run the Home Assistant gateway server")
+    parser.add_argument("--host", default="0.0.0.0", help="Host interface to bind")
+    parser.add_argument("--port", type=int, default=6443, help="Port to listen on")
+    parser.add_argument("--log-level", default="info", help="Uvicorn log level")
+    return parser.parse_args(argv)
+
+
+def main(argv: list[str] | None = None) -> None:
+    args = _parse_args(argv)
+    import uvicorn
+
+    uvicorn.run(
+        "tools.ha_gateway:app",
+        host=args.host,
+        port=args.port,
+        log_level=args.log_level,
+        factory=False,
+    )
+
+
+if __name__ == "__main__":
+    main()
