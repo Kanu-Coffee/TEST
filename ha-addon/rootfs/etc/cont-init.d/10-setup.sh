@@ -90,8 +90,18 @@ PY
     fi
 
     if ! "${PYTHON_BIN}" -m pip --version >/dev/null 2>&1; then
+        if command -v pip3 >/dev/null 2>&1; then
+            ln -sf "$(command -v pip3)" /usr/bin/pip
+        fi
+    fi
+
+    if ! "${PYTHON_BIN}" -m pip --version >/dev/null 2>&1; then
         bashio::log.fatal "pip module is not available even after bootstrapping"
         exit 1
+    fi
+
+    if ! command -v pip >/dev/null 2>&1 && command -v pip3 >/dev/null 2>&1; then
+        ln -sf "$(command -v pip3)" /usr/bin/pip
     fi
 
     "${PIP_CMD[@]}" install --upgrade pip

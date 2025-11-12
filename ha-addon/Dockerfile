@@ -8,7 +8,11 @@ ENV PIP_NO_CACHE_DIR=1 \
 
 RUN apk add --no-cache \
     git \
+    python3 \
     py3-pip
+
+RUN python3 -m ensurepip --upgrade \
+ && ln -sf /usr/bin/pip3 /usr/bin/pip
 
 WORKDIR /opt/bot
 

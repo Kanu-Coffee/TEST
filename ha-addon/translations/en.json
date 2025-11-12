@@ -11,7 +11,7 @@
                     },
                     "repository_ref": {
                         "title": "Repository branch or tag (Required)",
-                        "description": "Branch, tag, or commit to checkout after cloning."
+                        "description": "Branch, tag, or commit to checkout after cloning. Defaults to `codex-dev` for the latest features."
                     },
                     "exchange": {
                         "title": "Target exchange (Required)",

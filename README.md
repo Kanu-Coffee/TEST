@@ -103,10 +103,15 @@ leaving the dashboard.
    `https://github.com/Kanu-Coffee/TEST`를 추가합니다.
 2. **Bithumb/KIS Trading Bot** 애드온을 설치하고 구성 탭에서 안내 문구에 따라
    각 필드를 채웁니다 (필수/선택 여부가 UI에 표기됩니다).
+   - 기본값으로 애드온은 `codex-dev` 브랜치를 체크아웃합니다. 특정 커밋이나
+     다른 브랜치를 쓰고 싶다면 **Repository branch or tag** 필드를 변경하세요.
 3. 애드온을 시작하면 컨테이너가 코드를 클론하고 `python -m pip`으로 패키지를
    설치한 뒤 `python -m bot`과 FastAPI 게이트웨이를 실행합니다.
 4. 로그 패널에서 `Installing Python dependencies` 이후 오류가 없는지 확인하고,
    필요 시 `http://homeassistant.local:6443`로 접속해 리포트/지표를 살펴보세요.
+   - 이전 설치에서 남은 데이터 때문에 충돌한다면 애드온을 제거한 뒤
+     `config/bithumb_kis_bot`과 `share/bithumb_kis_bot` 폴더를 삭제하고 재설치하면
+     깨끗한 환경으로 시작할 수 있습니다.
 
 ## Repository layout
 
