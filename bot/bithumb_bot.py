@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import csv
 import math
+import os
 import random
 import time
 import uuid
@@ -26,8 +27,12 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 # Utility helpers
 # -----------------------------------------------------------------------------
 
+
 def _slug(config: BotConfig) -> str:
-    return config.exchange.lower()
+    # BotConfig에 exchange / symbol_ticker 이름이 있는 버전도 고려
+    if hasattr(config, "exchange"):
+        return str(config.exchange).lower()
+    return str(getattr(config, "bot_exchange", "bithumb")).lower()
 
 
 def _trade_log(config: BotConfig) -> Path:
@@ -205,12 +210,47 @@ def dyn_tp_sl(params: StrategyParams, vol_est: float) -> Tuple[float, float]:
 # Bot runner
 # -----------------------------------------------------------------------------
 
+
 def _select_params(config: BotConfig) -> StrategyParams:
     return config.hf_params if config.hf_mode else config.default_params
 
 
 def _ensure_order_id(result: OrderResult) -> str:
     return result.order_id or f"gen-{uuid.uuid4().hex[:12]}"
+
+
+def _resolve_base_reset_hours(config: BotConfig) -> float:
+    """
+    base_price를 리셋할 주기(시간 단위)를 결정한다.
+
+    우선순위:
+      1) BotConfig.base_reset_hours 속성 (있으면)
+      2) 환경변수 BASE_RESET_HOURS
+      3) 기본값 24.0시간
+    """
+    # 1) BotConfig 필드가 있으면 사용
+    if hasattr(config, "base_reset_hours"):
+        try:
+            val = getattr(config, "base_reset_hours")
+            if val is not None:
+                hours = float(val)
+                if hours >= 0:
+                    return hours
+        except (TypeError, ValueError):
+            pass
+
+    # 2) 환경변수
+    env_val = os.getenv("BASE_RESET_HOURS")
+    if env_val:
+        try:
+            hours = float(env_val)
+            if hours >= 0:
+                return hours
+        except ValueError:
+            pass
+
+    # 3) 기본값: 하루
+    return 24.0
 
 
 def run_bot(config: BotConfig | None = None) -> None:
@@ -231,6 +271,13 @@ def run_bot(config: BotConfig | None = None) -> None:
     order_times: Deque[float] = deque(maxlen=100)
     last_order = 0.0
 
+    # -------- base 리셋 관련 설정 --------
+    base_reset_hours = _resolve_base_reset_hours(config)
+    base_reset_seconds = max(0.0, base_reset_hours * 3600.0)
+    # 마지막으로 "유효한 매수"가 있었던 시점 (초기값은 봇 시작 시점)
+    last_buy_ts = time.time()
+    # -----------------------------------
+
     vol_estimator = EWMAStd(
         halflife=params.vol_halflife,
         floor=params.vol_min,
@@ -245,7 +292,7 @@ def run_bot(config: BotConfig | None = None) -> None:
 
     print(
         f"🚀 EXCHANGE={config.exchange} HF={config.hf_mode} START price={price:.4f} "
-        f"vol~{vol * 100:.2f}%"
+        f"vol~{vol * 100:.2f}% (base={base:.4f}, base_reset_hours={base_reset_hours})"
     )
 
     publisher = HomeAssistantPublisher(config, DATA_DIR, on_error=lambda msg: log_error(config, msg))
@@ -276,6 +323,8 @@ def run_bot(config: BotConfig | None = None) -> None:
             "hf_mode": config.hf_mode,
             "last_trade_time": last_trade_time,
             "last_trade_pnl": last_trade_pnl,
+            "base_price": base,
+            "base_reset_hours": base_reset_hours,
         }
         if error_message:
             payload["error"] = error_message
@@ -292,8 +341,9 @@ def run_bot(config: BotConfig | None = None) -> None:
 
     def mark_order() -> None:
         nonlocal last_order
-        order_times.append(time.time())
-        last_order = time.time()
+        now = time.time()
+        order_times.append(now)
+        last_order = now
 
     def record_daily(pnl_value: float, did_win: bool, did_loss: bool) -> None:
         date_key = datetime.now().strftime("%Y-%m-%d")
@@ -313,77 +363,58 @@ def run_bot(config: BotConfig | None = None) -> None:
         emit_metrics()
         while True:
             try:
-                # 최신 시세 가져오기
                 quote = exchange.fetch_quote()
                 price = quote.price
                 vol = vol_estimator.update(price)
                 tp_r, sl_r = dyn_tp_sl(params, vol)
 
-                # -------------------- base 가격 처리 --------------------
-                # 포지션이 있을 때만 base(그리드 기준)를 조정한다.
+                # ---------- base_price 관리 ----------
+                now = time.time()
+
+                # 1) 포지션이 있을 때: base 는 "기존 base vs 평균매수가" 중 더 낮은 값 유지
                 if positions:
                     tot_units = sum(u for _, u in positions)
-                    avg_price = sum(p * u for p, u in positions) / max(tot_units, 1e-12)
-
-                    # base 가 아직 0 이하라면 한 번만 세팅
+                    avg_price = sum(p * u for p, u in positions) / max(1e-12, tot_units)
                     if base <= 0:
                         base = avg_price
                     else:
-                        # 기존 base 와 평균 매수가 중 더 낮은 쪽을 유지해서
-                        # 기준가가 위로는 잘 안 올라가게 한다.
                         base = min(base, avg_price)
-                # 포지션이 하나도 없을 때는 base 를 건드리지 않는다.
-                # (맨 위에서 봇 시작 시 첫 quote 기준으로 한 번만 세팅됨)
-                # ------------------------------------------------------
+                else:
+                    # 2) 포지션이 없고, 일정 시간 이상 매수가 없으면 base를 현재가로 리셋
+                    if base_reset_seconds > 0:
+                        idle_for = now - last_buy_ts
+                        if idle_for >= base_reset_seconds:
+                            old_base = base
+                            base = price
+                            last_buy_ts = now
+                            msg = (
+                                f"🔁 BASE RESET: no BUY for {idle_for / 3600:.2f}h, "
+                                f"old_base={old_base:.4f} new_base={base:.4f}"
+                            )
+                            print(msg)
+                            # 굳이 error 로그까지는 아니지만, 추적용으로 남기고 싶으면 아래 유지
+                            # log_error(config, msg)
+                # -----------------------------------
 
-                # 현재 base 기준으로 그리드 트리거 가격 계산
-                triggers = [
-                    base * (1 - params.buy_step * (i + 1))
-                    for i in range(params.max_steps)
-                ]
+                triggers = [base * (1 - params.buy_step * (i + 1)) for i in range(params.max_steps)]
                 next_idx = len(positions)
 
-                # ------------------------ BUY 로직 ------------------------
                 if next_idx < params.max_steps and can_order():
                     trigger = triggers[next_idx]
-
-                    # 디버깅용으로 보고 싶으면 주석 해제
-                    # print(f"[DEBUG] step{next_idx + 1} trigger={trigger:.0f} price={price:.0f} base={base:.0f}")
-
                     if price <= trigger:
-                        order_value = params.base_order_value * (params.martingale_mul ** next_idx)
+                        order_value = params.base_order_value * (params.martingale_mul**next_idx)
                         raw_qty = exchange.value_to_quantity(order_value, price)
                         qty = exchange.round_quantity(raw_qty)
                         ord_price = exchange.round_price(price)
                         notional = exchange.notional_value(ord_price, qty)
-
-                        if not exchange.is_notional_sufficient(notional, qty):
-                            # 최소 주문 금액/수량 미만이라 스킵되는 경우를 로그로 남김
-                            log_trade(
-                                config,
-                                "BUY_SKIPPED_NOTIONAL",
-                                "BUY",
-                                ord_price,
-                                qty,
-                                notional,
-                                0.0,
-                                0.0,
-                                0.0,
-                                tp_r,
-                                sl_r,
-                                note="notional too small",
-                            )
-                            print(
-                                f"⏭️  SKIP BUY step{next_idx + 1}: "
-                                f"notional too small (notional={notional:.2f})"
-                            )
-                        else:
+                        if exchange.is_notional_sufficient(notional, qty):
                             result = exchange.place_order("buy", ord_price, qty)
                             if result.success:
                                 oid = _ensure_order_id(result)
                                 positions.append((ord_price, qty))
                                 pending[oid] = {"time": time.time(), "side": "buy"}
                                 mark_order()
+                                last_buy_ts = time.time()  # ✅ 마지막 매수 시점 갱신
                                 total_units = sum(u for _, u in positions)
                                 avg_price = sum(p * u for p, u in positions) / total_units
                                 log_trade(
@@ -420,10 +451,7 @@ def run_bot(config: BotConfig | None = None) -> None:
                                     sl_r,
                                     note=str(result.raw),
                                 )
-                    # price > trigger 인 경우는 너무 잦아서 로그는 생략
-                # ------------------------------------------------------
 
-                # ------------------------ SELL 로직 -----------------------
                 for bp, qty in list(positions):
                     change = (price - bp) / bp if bp else 0.0
                     take = change >= tp_r
@@ -485,9 +513,7 @@ def run_bot(config: BotConfig | None = None) -> None:
                                 sl_r,
                                 note=str(result.raw),
                             )
-                # ------------------------------------------------------
 
-                # --------------------- 주문 취소 로직 ----------------------
                 wait_seconds = max(
                     params.cancel_min_wait,
                     min(
@@ -503,21 +529,16 @@ def run_bot(config: BotConfig | None = None) -> None:
                         if exchange.cancel_order(order.order_id, order.side):
                             print("🕒 cancel", order.order_id, order.side)
                         pending.pop(order.order_id, None)
-                # ------------------------------------------------------
 
-                # 상태 로그 (30초마다 한 번)
                 if int(time.time()) % 30 == 0:
                     total_units = sum(u for _, u in positions)
                     avg_price = (
-                        sum(p * u for p, u in positions) / total_units
-                        if total_units > 0
-                        else 0.0
+                        sum(p * u for p, u in positions) / total_units if total_units > 0 else 0.0
                     )
                     print(
-                        f"[{ts()}] exch={config.exchange} price={price:.4f} "
-                        f"vol~{vol * 100:.2f}% TP={tp_r * 100:.2f}% SL={sl_r * 100:.2f}% "
-                        f"pos={total_units:.6f} avg={avg_price:.4f} "
-                        f"PnL={realized:.2f} trades={trades} W/L={win}/{loss}"
+                        f"[{ts()}] exch={config.exchange} price={price:.4f} vol~{vol * 100:.2f}% "
+                        f"TP={tp_r * 100:.2f}% SL={sl_r * 100:.2f}% pos={total_units:.6f} avg={avg_price:.4f} "
+                        f"PnL={realized:.2f} trades={trades} W/L={win}/{loss} base={base:.4f}"
                     )
 
                 emit_metrics()
@@ -529,7 +550,6 @@ def run_bot(config: BotConfig | None = None) -> None:
                 time.sleep(5)
     finally:
         publisher.close()
-
 
 
 def main() -> None:
