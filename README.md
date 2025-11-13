@@ -103,7 +103,7 @@ leaving the dashboard.
    `https://github.com/Kanu-Coffee/TEST`를 추가합니다.
 2. **Bithumb/KIS Trading Bot** 애드온을 설치하고 구성 탭에서 안내 문구에 따라
    각 필드를 채웁니다 (필수/선택 여부가 UI에 표기됩니다).
-   - 기본값으로 애드온은 `codex-dev` 브랜치를 체크아웃합니다. 특정 커밋이나
+   - 기본값으로 애드온은 `main` 브랜치를 체크아웃합니다. 특정 커밋이나
      다른 브랜치를 쓰고 싶다면 **Repository branch or tag** 필드를 변경하세요.
 3. 애드온을 시작하면 컨테이너가 코드를 클론하고 `python -m pip`으로 패키지를
    설치한 뒤 `python -m bot`과 FastAPI 게이트웨이를 실행합니다.
@@ -135,7 +135,7 @@ docs/           → reference documentation and strategy guides
 
 ## Contributing
 
-- 모든 작업은 `codex-dev` 브랜치에서 진행하고 자동 PR 워크플로우가 병합을 담당합니다.
+- 모든 작업은 `main` 브랜치에서 진행하고 자동 PR 워크플로우가 병합을 담당합니다.
 - PR 설명에는 테스트 결과와 변경 요약을 포함하세요.
 - 중복 코드나 사용하지 않는 파일이 보이면 정리해 주시면 감사하겠습니다.
 
