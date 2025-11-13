@@ -80,32 +80,18 @@ if [[ -z "${PYTHON_BIN}" ]]; then
     exit 1
 fi
 
-# ---------- pip bootstrap and dependency installation ----------
+# ---------- pip dependency installation (PEP 668-aware) ----------
 if [ -f /opt/bot/requirements.txt ]; then
     bashio::log.info "Installing Python dependencies"
 
-    # try ensurepip first
-    if "${PYTHON_BIN}" -m ensurepip --help >/dev/null 2>&1; then
-        "${PYTHON_BIN}" -m ensurepip --upgrade || bashio::log.warning "ensurepip upgrade reported an error"
-    else
-        bashio::log.warning "ensurepip module unavailable; attempting bootstrap via Python"
-    fi
+    # Allow pip to modify the system environment (PEP 668 override)
+    export PIP_BREAK_SYSTEM_PACKAGES=1
 
-    # verify pip module exists
-    if ! "${PYTHON_BIN}" -m pip --version >/dev/null 2>&1; then
-        bashio::log.info "Bootstrapping pip via ensurepip"
-        "${PYTHON_BIN}" - <<'PY'
-import ensurepip
-ensurepip.bootstrap(upgrade=True)
-PY
-    fi
-
-    # determine usable pip command
+    # determine usable pip command, prefer module invocation
     PIP_CMD=()
     if "${PYTHON_BIN}" -m pip --version >/dev/null 2>&1; then
-        # module invocation is always safe in HAOS
         PIP_CMD=("${PYTHON_BIN}" -m pip)
-        bashio::log.info "Using Python module invocation for pip"
+        bashio::log.info "Using Python module invocation for pip: ${PYTHON_BIN} -m pip"
     elif command -v pip3 >/dev/null 2>&1; then
         PIP_CMD=("$(command -v pip3)")
         bashio::log.warning "Using fallback pip3 executable: ${PIP_CMD[*]}"
@@ -122,9 +108,13 @@ PY
         ln -sf "$(command -v pip3)" /usr/bin/pip || true
     fi
 
-    # perform installation
-    "${PIP_CMD[@]}" install --upgrade pip
-    "${PIP_CMD[@]}" install --no-cache-dir -r /opt/bot/requirements.txt
+    # upgrade pip (best-effort, don't kill container if this fails)
+    if ! "${PIP_CMD[@]}" install --no-cache-dir --upgrade pip --break-system-packages; then
+        bashio::log.warning "pip upgrade failed, continuing with existing version"
+    fi
+
+    # install requirements
+    "${PIP_CMD[@]}" install --no-cache-dir --break-system-packages -r /opt/bot/requirements.txt
 fi
 # ---------------------------------------------------------------
 
