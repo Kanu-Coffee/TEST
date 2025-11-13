@@ -259,15 +259,24 @@ class BotConfig:
         def build_band(prefix: str, section: Mapping[str, Any], defaults: Dict[str, Any]) -> StrategyBand:
             env_prefix = prefix.upper()
 
-            def pick(name: str, *, aliases: Iterable[str] = ()) -> Any:
+            # ✅ 여기부터 수정된 부분
+            def pick(name: str, default_value: Any, *, aliases: Iterable[str] = ()) -> Any:
                 names = [f"{env_prefix}_{name.upper()}"] + list(aliases)
-                return _select(source_env, names, section.get(name.lower(), defaults[name]))
+                # 1) ENV 값 우선
+                # 2) YAML section[name.lower()]
+                # 3) 마지막으로 default_value
+                return _select(
+                    source_env,
+                    names,
+                    section.get(name.lower(), default_value),
+                )
 
             def f(name: str, default_value: float, aliases: Iterable[str] = ()) -> float:
-                return _as_float(pick(name, aliases=aliases), default_value)
+                return _as_float(pick(name, default_value, aliases=aliases), default_value)
 
             def i(name: str, default_value: int, aliases: Iterable[str] = ()) -> int:
-                return _as_int(pick(name, aliases=aliases), default_value)
+                return _as_int(pick(name, default_value, aliases=aliases), default_value)
+            # ✅ 수정 끝
 
             base_order_default = defaults.get("BASE_ORDER_VALUE", defaults.get("BASE_KRW", 0.0))
             base_aliases = [
