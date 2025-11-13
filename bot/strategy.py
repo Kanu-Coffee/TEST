@@ -115,12 +115,24 @@ class GridStrategy:
         self.volatility = self.vol_estimator.update(self.price)
         self.tp_ratio, self.sl_ratio = self._compute_targets(self.volatility)
 
+        # 포지션이 있을 때만 base_price를 조정한다.
+        # 없을 때는 초기 기준가(봇 시작 시점의 가격)를 그대로 유지해서
+        # 그 기준 아래로 내려가면 그리드 매수가 걸리도록 함.
         if self.state.positions:
             total_qty = sum(p.quantity for p in self.state.positions)
-            avg_price = sum(p.price * p.quantity for p in self.state.positions) / max(total_qty, 1e-12)
-            self.base_price = min(self.base_price, avg_price)
-        else:
-            self.base_price = self.price
+            avg_price = sum(
+                p.price * p.quantity for p in self.state.positions
+            ) / max(total_qty, 1e-12)
+
+            # 기존 기준가와 현재 평균 매수가 중 더 낮은 쪽을 기준으로 유지
+            # (원하면 min 대신 avg_price로 덮어써도 됨)
+            if self.base_price <= 0:
+                # 혹시 초기값이 0인 상태라면 한 번만 세팅
+                self.base_price = avg_price
+            else:
+                self.base_price = min(self.base_price, avg_price)
+        # 포지션이 하나도 없을 때는 base_price를 건드리지 않는다.
+        # (초기값은 __init__에서 첫 fetch_quote 기준으로 이미 한 번 세팅됨)
 
     def _compute_targets(self, volatility: float) -> tuple[float, float]:
         tp = max(self.band.tp_floor, volatility * self.band.tp_multiplier)
