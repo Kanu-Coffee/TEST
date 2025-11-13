@@ -318,12 +318,21 @@ def run_bot(config: BotConfig | None = None) -> None:
                 vol = vol_estimator.update(price)
                 tp_r, sl_r = dyn_tp_sl(params, vol)
 
+                # ---------- 여기부터 수정 ----------
                 if positions:
                     tot_units = sum(u for _, u in positions)
                     avg_price = sum(p * u for p, u in positions) / max(1e-12, tot_units)
-                    base = min(base, avg_price)
-                else:
-                    base = price
+
+                    # base 가 아직 0이거나 음수면 한 번만 세팅
+                    if base <= 0:
+                        base = avg_price
+                    else:
+                        # 기존 기준가와 평균 매수가 중 더 낮은 쪽을 유지
+                        base = min(base, avg_price)
+                # 포지션이 하나도 없을 때는 base 를 건드리지 않는다.
+                # (초기값은 맨 위에서 첫 quote 기준으로 한 번만 세팅됨)
+                # ---------- 수정 끝 ----------
+
 
                 triggers = [base * (1 - params.buy_step * (i + 1)) for i in range(params.max_steps)]
                 next_idx = len(positions)
