@@ -3,7 +3,7 @@ name: Auto PR Merge
 on:
   push:
     branches:
-      - codex-dev
+      - main
 
 jobs:
   auto-pr-merge:
@@ -94,10 +94,10 @@ NODE
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           base: main
-          branch: codex-dev
-          title: "Automated sync from codex-dev"
+          branch: main
+          title: "Automated sync from main"
           body: |
-            This pull request is maintained automatically by the auto-pr-merge workflow to keep `codex-dev` changes flowing into `main`.
+            This pull request is maintained automatically by the auto-pr-merge workflow to keep `main` changes flowing into `main`.
           delete-branch: false
           draft: false
 
@@ -109,7 +109,7 @@ NODE
           script: |
             const { owner, repo } = context.repo;
             const base = 'main';
-            const head = `${owner}:codex-dev`;
+            const head = `${owner}:main`;
             const prs = await github.paginate(github.rest.pulls.list, {
               owner,
               repo,
@@ -122,9 +122,9 @@ NODE
               pr = (await github.rest.pulls.create({
                 owner,
                 repo,
-                head: 'codex-dev',
+                head: 'main',
                 base,
-                title: 'Automated sync from codex-dev',
+                title: 'Automated sync from main',
                 body: 'This PR was created automatically by the auto-pr-merge workflow.'
               })).data;
             } else {
@@ -132,7 +132,7 @@ NODE
                 owner,
                 repo,
                 pull_number: pr.number,
-                title: 'Automated sync from codex-dev',
+                title: 'Automated sync from main',
                 body: 'This PR is automatically updated by the auto-pr-merge workflow.'
               });
             }
