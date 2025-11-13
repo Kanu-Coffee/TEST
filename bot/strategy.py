@@ -78,9 +78,10 @@ class GridStrategy:
             ceil=self.band.vol_max,
         )
 
+        # 초기 기준가 및 변동성 설정
         quote = self.exchange.fetch_quote()
         self.price = quote.price
-        self.base_price = self.price
+        self.base_price = self.price  # ★ 최초 기준 가격은 봇 시작 시점의 가격
         self.volatility = self.vol_estimator.update(self.price)
         self.tp_ratio, self.sl_ratio = self._compute_targets(self.volatility)
 
@@ -116,23 +117,25 @@ class GridStrategy:
         self.tp_ratio, self.sl_ratio = self._compute_targets(self.volatility)
 
         # 포지션이 있을 때만 base_price를 조정한다.
-        # 없을 때는 초기 기준가(봇 시작 시점의 가격)를 그대로 유지해서
-        # 그 기준 아래로 내려가면 그리드 매수가 걸리도록 함.
+        # - 포지션이 생기면 평균 매수단가가 기준이 되고
+        # - 물타기로 평단이 내려갈 경우 base_price도 함께 내려가게 함.
         if self.state.positions:
             total_qty = sum(p.quantity for p in self.state.positions)
             avg_price = sum(
                 p.price * p.quantity for p in self.state.positions
             ) / max(total_qty, 1e-12)
 
-            # 기존 기준가와 현재 평균 매수가 중 더 낮은 쪽을 기준으로 유지
-            # (원하면 min 대신 avg_price로 덮어써도 됨)
             if self.base_price <= 0:
-                # 혹시 초기값이 0인 상태라면 한 번만 세팅
+                # 혹시라도 초기값이 0이거나 깨졌다면 한 번만 재설정
                 self.base_price = avg_price
             else:
+                # 기존 기준가와 평단 중 더 낮은 쪽을 기준으로 유지
                 self.base_price = min(self.base_price, avg_price)
+
         # 포지션이 하나도 없을 때는 base_price를 건드리지 않는다.
-        # (초기값은 __init__에서 첫 fetch_quote 기준으로 이미 한 번 세팅됨)
+        # - 최초 실행 시: __init__에서 잡은 시작 가격을 유지
+        # - 모든 포지션 청산 후: 마지막 사이클의 기준 가격을 유지
+        # 이렇게 해야 base_price 아래로 내려갔을 때 그리드 매수가 동작한다.
 
     def _compute_targets(self, volatility: float) -> tuple[float, float]:
         tp = max(self.band.tp_floor, volatility * self.band.tp_multiplier)
@@ -156,7 +159,11 @@ class GridStrategy:
         self.last_order_ts = ts
 
     def _trigger_levels(self) -> List[float]:
-        return [self.base_price * (1 - self.band.buy_step * (i + 1)) for i in range(self.band.max_steps)]
+        # base_price를 기준으로 아래 방향으로 그리드 생성
+        return [
+            self.base_price * (1 - self.band.buy_step * (i + 1))
+            for i in range(self.band.max_steps)
+        ]
 
     def _maybe_buy(self) -> None:
         idx = len(self.state.positions)
@@ -164,6 +171,8 @@ class GridStrategy:
             return
 
         trigger_price = self._trigger_levels()[idx]
+
+        # 현재가가 트리거 가격 이하로 내려왔을 때만 매수
         if self.price > trigger_price:
             return
 
@@ -184,7 +193,9 @@ class GridStrategy:
             self.pending_orders[order_id] = {"time": time.time(), "side": "buy"}
             self._mark_order()
             total_units = sum(p.quantity for p in self.state.positions)
-            avg_price = sum(p.price * p.quantity for p in self.state.positions) / max(total_units, 1e-12)
+            avg_price = sum(
+                p.price * p.quantity for p in self.state.positions
+            ) / max(total_units, 1e-12)
             self.logger.log_trade(
                 event="BUY",
                 side="BUY",
@@ -218,11 +229,14 @@ class GridStrategy:
     def _maybe_sell(self) -> None:
         if not self.state.positions:
             return
+
         current_price = self.exchange.round_price(self.price)
+
         for position in list(self.state.positions):
             change = (self.price - position.price) / position.price if position.price else 0.0
             take_profit = change >= self.tp_ratio
             stop_loss = change <= -self.sl_ratio
+
             if not (take_profit or stop_loss):
                 continue
             if not self._can_place_order():
@@ -241,15 +255,18 @@ class GridStrategy:
                 else:
                     self.state.losses += 1
                     is_loss = True
+
                 self.state.positions.remove(position)
                 self.pending_orders[order_id] = {"time": time.time(), "side": "sell"}
                 self._mark_order()
+
                 remaining_units = sum(p.quantity for p in self.state.positions)
                 avg_price = (
                     sum(p.price * p.quantity for p in self.state.positions) / max(remaining_units, 1e-12)
                     if remaining_units
                     else 0.0
                 )
+
                 self.logger.log_trade(
                     event="SELL",
                     side="SELL",
@@ -335,6 +352,7 @@ class GridStrategy:
         self.publisher.publish(payload)
 
     def _log_status(self) -> None:
+        # 30초 단위로 상태 로그 (기존 로직 유지)
         if int(time.time()) % 30 != 0:
             return
         total_units = sum(p.quantity for p in self.state.positions)
