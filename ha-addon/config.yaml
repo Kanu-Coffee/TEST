@@ -20,7 +20,7 @@ map:
   - share:rw
 options:
   repository_url: https://github.com/Kanu-Coffee/TEST.git
-  repository_ref: codex-dev
+  repository_ref: main
   exchange: BITHUMB
   bot_symbol_ticker: USDT_KRW
   bot_order_currency: USDT
