@@ -53,3 +53,361 @@
 │   └── ...                 # 기타 유틸
 ├── requirements.txt
 └── README.md
+3. 설정 시스템 전체 이해
+3.1 설정 값 우선순위
+bot/config.py 에 정의된 로딩 순서는 다음과 같습니다.
+
+환경변수 (os.environ)
+
+프로젝트 루트의 .env 파일
+
+config/bot_config.yaml (있다면)
+
+즉, 같은 항목이 여러 군데에 있을 때 환경변수가 항상 최우선입니다.
+Home Assistant 애드온의 옵션도 내부적으로 환경변수로 전달되므로, 역시 1번 우선순위를 가집니다.
+
+4. 주요 설정 항목 (BotConfig)
+4.1 Bot 전역 설정 (bot 섹션)
+yaml
+코드 복사
+bot:
+  exchange: BITHUMB        # BITHUMB 또는 KIS
+  symbol_ticker: USDT_KRW  # 예: USDT_KRW, BTC_KRW, TQQQ
+  order_currency: USDT
+  payment_currency: KRW
+  dry_run: true
+  hf_mode: true
+  timezone: Asia/Seoul
+  report_interval_minutes: 60
+  log_level: INFO
+  base_reset_minutes: 1440  # 선택: N분 동안 매수 없으면 기준가(base) 리셋
+exchange
+
+BITHUMB : 빗썸 현물 / 코인
+
+KIS : 한국투자증권, 주식/ETF
+
+dry_run
+
+true : 주문은 시뮬레이션, 실제 주문 X
+
+false : 실제 주문
+
+hf_mode
+
+true : 고빈도(HF) 밴드 파라미터 사용
+
+false : 기본(default) 밴드 사용
+
+base_reset_minutes
+
+최근 매수 체결이 없는 시간이 N분을 넘으면 기준가(base) 를 현재 가격으로 재설정
+
+장이 한 방향으로만 오래 가서 그리드가 전혀 체결되지 않는 상황 방지
+
+기본값 1440분 = 24시간
+
+환경변수: BASE_RESET_MINUTES 또는 BOT_BASE_RESET_MINUTES
+
+4.2 거래소별 인증 설정
+4.2.1 Bithumb
+yaml
+코드 복사
+bithumb:
+  api_key: ""
+  api_secret: ""
+  base_url: https://api.bithumb.com
+  auth_mode: legacy    # 또는 jwt (추가 구현 시)
+api_key, api_secret
+
+빗썸 API 키
+
+환경변수: BITHUMB_API_KEY, BITHUMB_API_SECRET
+
+4.2.2 KIS (한국투자증권)
+yaml
+코드 복사
+kis:
+  app_key: ""
+  app_secret: ""
+  account_no: ""
+  account_password: ""
+  mode: paper                # paper | live
+  exchange_code: NASD        # 예: NASD, NYSE
+  symbol: TQQQ
+  currency: USD
+  order_lot_size: 1.0
+  base_url_paper: https://openapivts.koreainvestment.com:29443
+  base_url_live:  https://openapi.koreainvestment.com:9443
+mode:
+
+paper : 모의투자
+
+live : 실계좌
+
+⚠️ KIS 실계좌 모드는 API 제한, 체결 규칙 등 제약이 많으므로
+충분한 모의 테스트 후에만 사용하세요.
+
+5. 전략 파라미터 (StrategyBand)
+전략은 두 개의 밴드로 정의됩니다.
+
+strategy.default – 일반 모드
+
+strategy.high_frequency – HF 모드 (bot.hf_mode: true 일 때 사용)
+
+각 밴드에는 다음과 같은 필드가 있습니다.
+
+yaml
+코드 복사
+strategy:
+  default:
+    buy_step: 0.008
+    martingale_multiplier: 1.5
+    max_steps: 10
+    base_order_value: 5000
+    tp_multiplier: 0.55
+    sl_multiplier: 1.25
+    tp_floor: 0.003
+    sl_floor: 0.007
+    vol_halflife: 60
+    vol_min: 0.001
+    vol_max: 0.015
+    sleep_seconds: 2.0
+    order_cooldown: 6.0
+    max_orders_per_minute: 6
+    cancel_base_wait: 10.0
+    cancel_min_wait: 5.0
+    cancel_max_wait: 30.0
+    cancel_volume_scale: 2000.0
+
+  high_frequency:
+    buy_step: 0.005
+    martingale_multiplier: 1.3
+    max_steps: 10
+    base_order_value: 5000
+    ...
+5.1 매수 관련
+buy_step
+
+그리드 간격 (비율)
+
+예: buy_step=0.005, base=1500 이면
+
+1차 매수 트리거: 1500 * (1 - 0.005) = 1492.5
+
+2차: 1500 * (1 - 0.010) = 1485
+
+...
+
+martingale_multiplier
+
+아래로 내려갈수록 주문 금액을 곱해가는 배수
+
+예: 1.3, base_order_value=5000 이면
+
+1차 5,000원
+
+2차 6,500원
+
+3차 8,450원 …
+
+max_steps
+
+최대 몇 번까지 아래로 깔 것인지
+
+base_order_value
+
+첫 매수 주문의 KRW 기준 금액 (혹은 USD 등)
+
+5.2 TP / SL & 변동성
+EWMA 기반으로 24h 변동성을 추정한 뒤:
+
+python
+코드 복사
+tp = max(tp_floor,  vol * tp_multiplier)
+sl = max(sl_floor,  vol * sl_multiplier)
+tp_floor, sl_floor: 최소 익절/손절 한계
+
+tp_multiplier, sl_multiplier: 변동성에 곱해지는 계수
+
+예:
+
+vol ≈ 0.0045 (0.45%), tp_multiplier=0.8, tp_floor=0.0015
+→ TP ≈ max(0.15%, 0.36%) = 0.36%
+
+즉 각 포지션별 개별 진입가 기준으로 ±TP/SL 비율에 도달하면 매도 시도.
+
+5.3 주문 빈도 제한 & 취소
+order_cooldown
+
+마지막 주문 이후 최소 대기 시간(초)
+
+max_orders_per_minute
+
+1분 동안 허용되는 최대 주문 수
+
+cancel_base_wait, cancel_min_wait, cancel_max_wait, cancel_volume_scale
+
+24h 거래량을 기준으로 시장 유동성에 따라 주문 유지/취소까지 기다리는 시간을 동적으로 조정
+
+6. GridStrategy 동작 요약
+6.1 기준가(base)와 그리드
+봇 시작 시, 첫 시세를 base 로 잡음.
+
+포지션이 전혀 없을 때는 base 를 유지 (계속 위에 있어도 그대로).
+
+포지션이 생기면:
+
+모든 포지션의 가중 평균가 avg_price 계산
+
+base = min(base, avg_price)
+→ 평단이 내려갈수록 기준가도 함께 내려가지만, 평단이 올라가면 기준가는 그대로여서
+그리드가 위로 따라 올라가 추격 매수는 하지 않음.
+
+N분 동안 매수 체결이 없다면 (base_reset_minutes)
+
+base 를 현재 가격으로 다시 설정 → 새로운 구간에서 다시 그리드 구축
+
+6.2 매수 조건
+positions 길이가 max_steps 미만
+
+can_order() 가 True (쿨다운 및 분당 횟수 제한 통과)
+
+현재 가격 price 가 다음 트리거 trigger = base * (1 - buy_step * (next_idx + 1)) 이하
+→ 시장가(또는 지정가) 매수 시도 후, 성공 시 포지션 리스트에 추가
+
+6.3 매도 조건
+각 포지션 (bp, qty) 에 대해:
+
+change = (price - bp) / bp
+
+change >= TP → 익절
+
+change <= -SL → 손절
+둘 중 하나 만족 + can_order() → 매도 주문
+
+성공 시:
+
+실현 손익 누적
+
+일별 통계 CSV 업데이트
+
+포지션 제거 / 남은 포지션 평균가 재계산
+
+HA 메트릭 업데이트
+
+7. 설치 및 실행
+7.1 Python 단독 실행
+클론
+
+bash
+코드 복사
+git clone https://github.com/Kanu-Coffee/TEST.git
+cd TEST
+가상환경 + 의존성
+
+bash
+코드 복사
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+pip install --upgrade pip
+pip install -r requirements.txt
+설정 파일 준비
+
+bash
+코드 복사
+cp config/bot_config.example.yaml config/bot_config.yaml
+# 편집기에서 본인 API 키 / 전략 파라미터 입력
+실행
+
+bash
+코드 복사
+python -m bot.runner
+dry_run: true 로 충분히 테스트 후 false 로 변경
+
+7.2 Home Assistant 애드온으로 사용
+Home Assistant → 설정 → 애드온 → 애드온 스토어 → 우측 상단 메뉴 → 저장소
+
+저장소 URL 추가:
+
+text
+코드 복사
+https://github.com/Kanu-Coffee/TEST.git
+Bithumb/KIS Trading Bot 애드온 설치
+
+옵션에서:
+
+repository_url, repository_ref (일반적으로 기본값 유지)
+
+exchange, bot_symbol_ticker, 전략 파라미터, API 키 등 입력
+
+enable_gateway 를 true 로 하면 http://HA_IP:6443 에서 웹 UI 접근 가능
+
+애드온 시작 후 로그에서:
+
+Environment prepared
+
+Starting trading bot
+
+체결 내역/상태 로그 확인
+
+8. 로그 & 리포트
+8.1 CSV/로그 파일
+/data (또는 프로젝트 data/) 아래에 생성됩니다.
+
+{exchange}_trades.csv
+
+시간, 이벤트(BUY/SELL), 가격, 수량, 포지션, TP/SL, 메모
+
+{exchange}_daily_summary.csv
+
+일별 실현 손익, 거래 수, win/loss 횟수
+
+{exchange}_errors.log
+
+예외/오류 메시지
+
+8.2 Home Assistant 메트릭
+HomeAssistantPublisher 와 ha_gateway 를 통해:
+
+REST 엔드포인트로 현재 상태 JSON 제공
+
+HA 센서/차트에서 가격, 포지션, PnL, 최근 거래 등 확인 가능
+
+9. 운용 팁 & 권장 설정
+USDT_KRW 같이 변동성이 낮은 코인:
+
+buy_step 을 작게 (예: 0.0015 ~ 0.003)
+
+max_steps 를 더 크게 (예: 15~20)
+
+martingale_multiplier 는 너무 세게 올리지 말 것 (1.2~1.3 근처)
+
+BTC_KRW 같이 변동성이 큰 코인:
+
+buy_step 을 크게 (0.004 ~ 0.008)
+
+max_steps 는 자본 및 허용 리스크에 따라 조정
+
+KIS 주식/ETF:
+
+장 시간, 호가 규칙, 체결 속도가 다르므로
+꼭 소액으로 충분히 테스트 후 실계좌 전환
+
+10. 주의사항 & 면책 조항
+이 코드는 개인 실험용 프로젝트입니다.
+
+거래소 API 정책 변경, 레버리지, 슬리피지 등으로 실제 결과는 시뮬레이션과 다를 수 있습니다.
+
+모든 매매에 따르는 손실 및 리스크는 전적으로 사용자 본인 책임입니다.
+
+항상:
+
+드라이런(dry_run)으로 먼저 검증
+
+소액으로 실험
+
+충분한 기간 백테스트 수행 후 실전 투입을 추천합니다.
+
+yaml
+코드 복사
