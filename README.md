@@ -144,10 +144,16 @@ http://<HA_LOCAL_IP>:6443/
 
 기본적으로 프로젝트 또는 HA 애드온의 `/data` 경로에 생성됩니다.
 
+- 기본 위치: **`/config/bithumb-bot/`** (HA 파일 편집기에서 바로 열 수 있음)
 - `bithumb_trades.csv`
 - `bithumb_daily_summary.csv`
 - `bithumb_errors.log`
 - (KIS 사용 시 `kis_*` 파일들)
+
+웹 보기 전용 게이트웨이도 추가되었습니다.
+
+- `http://<HA_LOCAL_IP>:6442/` → 최근 거래 로그
+- `http://<HA_LOCAL_IP>:6441/` → 에러 로그 및 에러 코드 확인
 
 ---
 
