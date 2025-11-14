@@ -111,6 +111,26 @@ class BithumbExchange(Exchange):
                 response = self._session.post(url, headers=headers, data=encoded, timeout=7)
             response.raise_for_status()
             return response.json()
+        except requests.HTTPError as exc:
+            payload: Dict[str, object] = {"status": "HTTP_ERROR", "message": str(exc)}
+            resp = exc.response
+            if resp is not None:
+                payload["http_status"] = resp.status_code
+                body_text = resp.text
+                payload["body"] = body_text
+                try:
+                    body_json = resp.json()
+                except ValueError:
+                    body_json = None
+                if isinstance(body_json, dict):
+                    payload["body_json"] = body_json
+                    status = body_json.get("status")
+                    message = body_json.get("message")
+                    if status and "remote_status" not in payload:
+                        payload["remote_status"] = status
+                    if message and "remote_message" not in payload:
+                        payload["remote_message"] = message
+            return payload
         except requests.RequestException as exc:
             return {"status": "HTTP_ERROR", "message": str(exc)}
         except ValueError as exc:
@@ -121,6 +141,11 @@ class BithumbExchange(Exchange):
         if status in ERROR_HINTS and "hint" not in payload:
             payload = dict(payload)
             payload["hint"] = ERROR_HINTS[status]
+            return payload
+        remote_status = str(payload.get("remote_status", ""))
+        if remote_status in ERROR_HINTS and "hint" not in payload:
+            payload = dict(payload)
+            payload["hint"] = ERROR_HINTS[remote_status]
         return payload
 
     # ------------------------------------------------------------------
