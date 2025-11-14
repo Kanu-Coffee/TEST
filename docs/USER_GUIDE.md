@@ -114,7 +114,7 @@ bithumb:
   api_key: ""
   api_secret: ""
   base_url: https://api.bithumb.com
-  rest_base_url: https://api.bithumb.com
+  rest_base_url: https://global-openapi.bithumb.com
   rest_place_endpoint: /api/v2/spot/trade/place
   rest_market_buy_endpoint: /api/v2/spot/trade/market_buy
   rest_market_sell_endpoint: /api/v2/spot/trade/market_sell
@@ -137,7 +137,7 @@ bithumb:
   - 빗썸 API 문서(https://apidocs.bithumb.com/) 기준 엔드포인트를 원하는 버전으로 교체 가능
 - `rest_symbol_dash`, `rest_symbol_upper`
   - v2.1 심볼 포맷이 `BTC-KRW` 처럼 하이픈/대문자를 요구할 때 조정
-- 주문 시그니처는 공식 문서처럼 **HMAC-SHA512 → hex → Base64** 순으로 계산합니다.
+- 주문 시그니처는 공식 문서처럼 **HMAC-SHA512 → Base64**(바이너리 다이제스트) 순으로 계산합니다.
   봇이 millisecond nonce 를 자동 생성하지만, 동일 ms 내 다중 주문을 위해
   시스템 시간이 역행하지 않도록 NTP 동기화를 유지해 주세요.
 

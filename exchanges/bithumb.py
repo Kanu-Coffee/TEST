@@ -62,7 +62,14 @@ class BithumbExchange(Exchange):
         self._last_nonce = now
         return str(now)
 
-    def _signed_headers(self, endpoint: str, body: str, *, content_type: Optional[str] = None) -> Dict[str, str]:
+    def _signed_headers(
+        self,
+        endpoint: str,
+        body: str,
+        *,
+        content_type: Optional[str] = None,
+        signature_style: str = "digest",
+    ) -> Dict[str, str]:
         cred = self.config.bithumb
         headers: Dict[str, str] = {"Api-Client-Type": "2"}
         if cred.auth_mode.lower() == "jwt":
@@ -76,7 +83,11 @@ class BithumbExchange(Exchange):
 
         nonce = self._next_nonce()
         payload = f"{endpoint}\x00{body}\x00{nonce}".encode("utf-8")
-        digest = hmac.new(cred.api_secret.encode("utf-8"), payload, hashlib.sha512).hexdigest().encode("utf-8")
+        mac = hmac.new(cred.api_secret.encode("utf-8"), payload, hashlib.sha512)
+        if signature_style.lower() == "hex":
+            digest = mac.hexdigest().encode("utf-8")
+        else:
+            digest = mac.digest()
         signature = base64.b64encode(digest).decode("utf-8")
         headers.update(
             {
@@ -119,9 +130,15 @@ class BithumbExchange(Exchange):
         data: Optional[str],
         json_payload: Optional[Dict[str, Any]],
         content_type: str,
+        signature_style: str = "digest",
         **_: Any,
     ) -> Tuple[bool, Dict[str, object]]:
-        headers = self._signed_headers(endpoint, body, content_type=content_type)
+        headers = self._signed_headers(
+            endpoint,
+            body,
+            content_type=content_type,
+            signature_style=signature_style,
+        )
         request_kwargs: Dict[str, Any] = {
             "url": url,
             "headers": headers,
@@ -207,7 +224,13 @@ class BithumbExchange(Exchange):
             }
         return {"status": "HTTP_ERROR", "message": "요청이 실패했습니다."}
 
-    def _build_legacy_variant(self, endpoint: str, params: Dict[str, str]) -> Dict[str, Any]:
+    def _build_legacy_variant(
+        self,
+        endpoint: str,
+        params: Dict[str, str],
+        *,
+        signature_style: str = "digest",
+    ) -> Dict[str, Any]:
         encoded = urlencode(params or {}, doseq=True)
         return {
             "name": "legacy",
@@ -217,6 +240,7 @@ class BithumbExchange(Exchange):
             "data": encoded,
             "json_payload": None,
             "content_type": "application/x-www-form-urlencoded",
+            "signature_style": signature_style,
         }
 
     def _build_rest_variant(self, rest: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -240,6 +264,7 @@ class BithumbExchange(Exchange):
             "data": data,
             "json_payload": json_payload,
             "content_type": "application/json",
+            "signature_style": "digest",
         }
 
     def _normalise_payload(self, payload: Dict[str, Any]) -> Dict[str, Any]:

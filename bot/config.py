@@ -120,7 +120,7 @@ class BithumbSettings:
     api_key: str = ""
     api_secret: str = ""
     base_url: str = "https://api.bithumb.com"
-    rest_base_url: str = "https://api.bithumb.com"
+    rest_base_url: str = "https://global-openapi.bithumb.com"
     rest_place_endpoint: str = "/api/v2/spot/trade/place"
     rest_market_buy_endpoint: str = "/api/v2/spot/trade/market_buy"
     rest_market_sell_endpoint: str = "/api/v2/spot/trade/market_sell"
@@ -417,7 +417,10 @@ class BotConfig:
                 _select(
                     source_env,
                     ["BITHUMB_REST_BASE_URL"],
-                    bithumb_section.get("rest_base_url", bithumb_section.get("base_url", "https://api.bithumb.com")),
+                    bithumb_section.get(
+                        "rest_base_url",
+                        bithumb_section.get("base_url", "https://global-openapi.bithumb.com"),
+                    ),
                 )
             ).strip(),
             rest_place_endpoint=str(

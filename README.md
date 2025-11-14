@@ -150,13 +150,6 @@ http://<HA_LOCAL_IP>:6443/
   - `bithumb.enable_failover`: `true` 면 실패 시 다른 버전으로 자동 재시도
   - `bithumb.rest_symbol_dash/rest_symbol_upper`: 심볼 표기 형태 조정
 
-- **Bithumb API 페일오버**
-
-  - `bithumb.rest_*_endpoint`: v2.1.0 REST 경로 (기본 제공값 사용 가능)
-  - `bithumb.prefer_rest`: `true` → REST 우선, `false` → 레거시 우선
-  - `bithumb.enable_failover`: `true` 면 실패 시 다른 버전으로 자동 재시도
-  - `bithumb.rest_symbol_dash/rest_symbol_upper`: 심볼 표기 형태 조정
-
 자세한 설명은 `docs/USER_GUIDE.md` 를 참고하세요.
 
 ---
