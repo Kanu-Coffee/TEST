@@ -1,4 +1,4 @@
-"""Bithumb REST exchange adapter."""
+"""Bithumb REST exchange adapter (v1.2.0 legacy + v2.1.x JWT)."""
 from __future__ import annotations
 
 import base64
@@ -38,7 +38,35 @@ def _now_ms() -> str:
     return str(int(time.time() * 1000))
 
 
+def _b64url(data: bytes) -> str:
+    """Minimal base64url encoder without padding (for HS256 JWT)."""
+    return base64.urlsafe_b64encode(data).rstrip(b"=").decode("ascii")
+
+
+def _encode_jwt_hs256(payload: Dict[str, Any], secret: str) -> str:
+    """
+    Minimal HS256 JWT 구현 (pyjwt 미의존).
+    Bithumb v2.1.x 가이드의 HS256 서명 방식과 동일한 포맷을 따른다.
+    """
+    header = {"alg": "HS256", "typ": "JWT"}
+    header_bytes = json.dumps(header, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    payload_bytes = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
+
+    header_b64 = _b64url(header_bytes)
+    payload_b64 = _b64url(payload_bytes)
+    signing_input = f"{header_b64}.{payload_b64}".encode("ascii")
+
+    signature = hmac.new(secret.encode("utf-8"), signing_input, hashlib.sha256).digest()
+    sig_b64 = _b64url(signature)
+    return f"{header_b64}.{payload_b64}.{sig_b64}"
+
+
 class BithumbExchange(Exchange):
+    """
+    - auth_mode == 'legacy' (기본값): v1.2.0 HMAC (기존 /public, /trade, /info 엔드포인트)
+    - auth_mode == 'jwt'         : v2.1.x JWT  ( /v1/ticker, /v1/orders, /v1/order 등)
+    """
+
     def __init__(self, config: BotConfig) -> None:
         super().__init__(config)
         self._session = requests.Session()
@@ -401,11 +429,11 @@ class BithumbExchange(Exchange):
         if not isinstance(payload, dict) or str(payload.get("status")) != "0000":
             return []
         rows: List[OpenOrder] = []
-        for row in payload.get("data") or []:
+        for row in data:
             rows.append(
                 OpenOrder(
-                    order_id=str(row.get("order_id")),
-                    side="buy" if str(row.get("type", "bid")).lower() == "bid" else "sell",
+                    order_id=str(row.get("uuid")),
+                    side="buy" if str(row.get("side", "bid")).lower() == "bid" else "sell",
                 )
             )
         return rows
@@ -414,12 +442,15 @@ class BithumbExchange(Exchange):
     # Normalisation helpers
     # ------------------------------------------------------------------
     def round_price(self, price: float) -> float:
+        # KRW 마켓 기준: 1원 단위 절사 (필요하면 나중에 호가단위 로직 붙일 수 있음)
         return float(int(round(price)))
 
     def round_quantity(self, quantity: float) -> float:
+        # BTC/USDT 등 소수 8자리까지 허용
         return round(quantity, 8)
 
     def min_notional(self) -> float:
+        # 최소 주문 금액 (KRW 기준). 필요시 config로 뺄 수 있음.
         return 5000.0
 
     def _rest_symbol(self) -> str:
