@@ -2,15 +2,14 @@
 from __future__ import annotations
 
 import csv
+import shutil
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Dict
 
-from .config import BotConfig, ROOT_DIR
-
-DATA_DIR = ROOT_DIR / "data"
-DATA_DIR.mkdir(parents=True, exist_ok=True)
+from .config import BotConfig
+from .paths import DATA_DIR, LEGACY_DATA_DIR
 
 
 @dataclass
@@ -38,6 +37,7 @@ class TradeLogger:
             error_log=DATA_DIR / f"{slug}_errors.log",
             summary_log=DATA_DIR / f"{slug}_daily_summary.csv",
         )
+        self._migrate_legacy(slug)
         self._ensure_headers()
         self._summary_cache = self._load_summary()
 
@@ -103,6 +103,21 @@ class TradeLogger:
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
+    def _migrate_legacy(self, slug: str) -> None:
+        """Copy legacy log files if they exist in the old data directory."""
+        legacy_files = {
+            LEGACY_DATA_DIR / f"{slug}_trades.csv": self.paths.trade_log,
+            LEGACY_DATA_DIR / f"{slug}_errors.log": self.paths.error_log,
+            LEGACY_DATA_DIR / f"{slug}_daily_summary.csv": self.paths.summary_log,
+        }
+        for src, dest in legacy_files.items():
+            if src.exists() and not dest.exists():
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                try:
+                    shutil.copy2(src, dest)
+                except OSError:
+                    continue
+
     def _ensure_headers(self) -> None:
         if not self.paths.trade_log.exists():
             with self.paths.trade_log.open("w", newline="", encoding="utf-8") as handle:

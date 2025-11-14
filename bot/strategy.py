@@ -77,6 +77,7 @@ class GridStrategy:
             floor=self.band.vol_min,
             ceil=self.band.vol_max,
         )
+        self._last_clock_warning = 0.0
 
         # 초기 기준가 및 변동성 설정
         quote = self.exchange.fetch_quote()
@@ -115,6 +116,15 @@ class GridStrategy:
         self.price = quote.price
         self.volatility = self.vol_estimator.update(self.price)
         self.tp_ratio, self.sl_ratio = self._compute_targets(self.volatility)
+
+        if quote.server_time:
+            drift = abs(time.time() - quote.server_time)
+            if drift > 3 and time.time() - self._last_clock_warning > 60:
+                self.logger.log_error(
+                    f"거래소 서버 시간과 시스템 시간 차이가 {drift:.2f}초입니다. "
+                    "서버 시간 동기화와 IP/JWT 설정을 다시 확인하세요."
+                )
+                self._last_clock_warning = time.time()
 
         # 포지션이 있을 때만 base_price를 조정한다.
         # - 포지션이 생기면 평균 매수단가가 기준이 되고

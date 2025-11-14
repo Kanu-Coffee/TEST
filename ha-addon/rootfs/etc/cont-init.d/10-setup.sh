@@ -33,6 +33,9 @@ KIS_CURRENCY="$(bashio::config 'kis_currency')"
 KIS_ORDER_LOT_SIZE="$(bashio::config 'kis_order_lot_size')"
 ENABLE_GATEWAY="$(bashio::config 'enable_gateway')"
 GATEWAY_PORT="$(bashio::config 'gateway_port')"
+ENABLE_LOG_GATEWAY="$(bashio::config 'enable_log_gateway')"
+TRADE_LOG_PORT="$(bashio::config 'trade_log_port')"
+ERROR_LOG_PORT="$(bashio::config 'error_log_port')"
 
 # sensible defaults
 SYMBOL=${SYMBOL:-USDT_KRW}
@@ -54,6 +57,8 @@ KIS_SYMBOL=${KIS_SYMBOL:-TQQQ}
 KIS_CURRENCY=${KIS_CURRENCY:-USD}
 KIS_ORDER_LOT_SIZE=${KIS_ORDER_LOT_SIZE:-1.0}
 GATEWAY_PORT=${GATEWAY_PORT:-6443}
+TRADE_LOG_PORT=${TRADE_LOG_PORT:-6442}
+ERROR_LOG_PORT=${ERROR_LOG_PORT:-6441}
 
 # ensure PATH covers all base locations (s6 init path bug workaround)
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PATH:-}"
@@ -145,6 +150,7 @@ fi
 
 # generate .env
 mkdir -p /data/bot
+mkdir -p /config/bithumb-bot
 ENV_FILE="/data/bot/.env"
 {
     printf 'EXCHANGE=%s\n' "${EXCHANGE}"
@@ -174,9 +180,13 @@ ENV_FILE="/data/bot/.env"
     printf 'KIS_SYMBOL=%s\n' "${KIS_SYMBOL}"
     printf 'KIS_CURRENCY=%s\n' "${KIS_CURRENCY}"
     printf 'KIS_ORDER_LOT_SIZE=%s\n' "${KIS_ORDER_LOT_SIZE}"
+    printf 'BOT_DATA_DIR=%s\n' "/config/bithumb-bot"
 } > "${ENV_FILE}"
 
 echo "ENABLE_GATEWAY=${ENABLE_GATEWAY}" > /var/run/ha_bot_enable_gateway
 echo "${GATEWAY_PORT}" > /var/run/ha_bot_gateway_port
+echo "ENABLE_LOG_GATEWAY=${ENABLE_LOG_GATEWAY}" > /var/run/ha_bot_enable_log_gateway
+echo "${TRADE_LOG_PORT}" > /var/run/ha_bot_trade_port
+echo "${ERROR_LOG_PORT}" > /var/run/ha_bot_error_port
 
 bashio::log.info "Environment prepared"
