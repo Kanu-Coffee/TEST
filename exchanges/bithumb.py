@@ -10,6 +10,7 @@ import uuid
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 from urllib.parse import urlencode
 
+import jwt
 import requests
 
 from bot.config import BotConfig
@@ -68,16 +69,17 @@ class BithumbExchange(Exchange):
         body: str,
         *,
         content_type: Optional[str] = None,
-        signature_style: str = "digest",
+        signature_style: str = "hex",
     ) -> Dict[str, str]:
         cred = self.config.bithumb
         headers: Dict[str, str] = {"Api-Client-Type": "2"}
-        if cred.auth_mode.lower() == "jwt":
+        auth_mode = cred.auth_mode.lower()
+        if auth_mode == "jwt":
             headers.update(
-                {
-                    "Authorization": f"Bearer {cred.api_key}",
-                    "Content-Type": content_type or "application/json",
-                }
+                self._jwt_headers(
+                    body=body,
+                    content_type=content_type or "application/json",
+                )
             )
             return headers
 
@@ -85,10 +87,10 @@ class BithumbExchange(Exchange):
         payload = f"{endpoint}\x00{body}\x00{nonce}".encode("utf-8")
         mac = hmac.new(cred.api_secret.encode("utf-8"), payload, hashlib.sha512)
         if signature_style.lower() == "hex":
-            digest = mac.hexdigest().encode("utf-8")
+            digest_bytes = mac.hexdigest().encode("utf-8")
         else:
-            digest = mac.digest()
-        signature = base64.b64encode(digest).decode("utf-8")
+            digest_bytes = mac.digest()
+        signature = base64.b64encode(digest_bytes).decode("utf-8")
         headers.update(
             {
                 "Api-Key": cred.api_key,
@@ -98,6 +100,25 @@ class BithumbExchange(Exchange):
             }
         )
         return headers
+
+    def _jwt_headers(self, *, body: str, content_type: str) -> Dict[str, str]:
+        cred = self.config.bithumb
+        if not cred.api_key or not cred.api_secret:
+            raise ValueError("Bithumb JWT mode requires api_key and api_secret")
+        body_bytes = body.encode("utf-8") if body else b""
+        query_hash = hashlib.sha512(body_bytes).hexdigest()
+        payload = {
+            "access_key": cred.api_key,
+            "nonce": str(uuid.uuid4()),
+            "timestamp": int(time.time() * 1000),
+            "query_hash": query_hash,
+            "query_hash_alg": "SHA512",
+        }
+        token = jwt.encode(payload, cred.api_secret, algorithm="HS256")
+        return {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": content_type,
+        }
 
     def _format_http_error(self, exc: requests.HTTPError) -> Dict[str, object]:
         payload: Dict[str, object] = {"status": "HTTP_ERROR", "message": str(exc)}
@@ -177,11 +198,11 @@ class BithumbExchange(Exchange):
                     "hint": "Home Assistant 애드온 설정 또는 config/bot_config.yaml에 API 키와 시크릿을 입력했는지 확인하세요.",
                 }
         else:
-            if not self.config.bithumb.api_key:
+            if not self.config.bithumb.api_key or not self.config.bithumb.api_secret:
                 return {
                     "status": "CONFIG_ERROR",
-                    "message": "Bithumb JWT 토큰이 설정되지 않았습니다.",
-                    "hint": "애드온 설정의 BITHUMB_API_KEY 자리에 발급받은 JWT를 입력하세요.",
+                    "message": "Bithumb JWT 주문에는 Access Key와 Secret이 모두 필요합니다.",
+                    "hint": "애드온 설정의 BITHUMB_API_KEY, BITHUMB_API_SECRET 값을 다시 확인하세요.",
                 }
 
         legacy_variant = self._build_legacy_variant(endpoint, params)
@@ -229,7 +250,7 @@ class BithumbExchange(Exchange):
         endpoint: str,
         params: Dict[str, str],
         *,
-        signature_style: str = "digest",
+        signature_style: str = "hex",
     ) -> Dict[str, Any]:
         encoded = urlencode(params or {}, doseq=True)
         return {
@@ -249,13 +270,8 @@ class BithumbExchange(Exchange):
             return None
         params = dict(rest.get("params") or {})
         body = json.dumps(params, ensure_ascii=False, separators=(",", ":"))
-        auth_mode = self.config.bithumb.auth_mode.lower()
-        if auth_mode == "jwt":
-            data = None
-            json_payload: Optional[Dict[str, Any]] = params
-        else:
-            data = body
-            json_payload = None
+        data = body
+        json_payload: Optional[Dict[str, Any]] = None
         return {
             "name": "rest",
             "url": f"{self._rest_base_url()}{endpoint}",
