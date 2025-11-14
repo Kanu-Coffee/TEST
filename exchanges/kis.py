@@ -108,7 +108,7 @@ class KisExchange(Exchange):
         output = data.get("output", {})
         price = float(output.get("last", output.get("ovrs_prpr", 0)) or 0)
         volume = float(output.get("acml_vol", output.get("ovrs_vol", 0)) or 0)
-        return Quote(price=price, volume_24h=volume)
+        return Quote(price=price, volume_24h=volume, timestamp=time.time())
 
     def place_order(self, side: str, price: float, quantity: float) -> OrderResult:
         if self.config.bot.dry_run:

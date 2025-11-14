@@ -8,8 +8,9 @@ from typing import Dict, Iterable, List
 
 from bot.config import BotConfig
 from bot.logs import TradeLogger
+from bot.paths import DATA_DIR
 
-DEFAULT_OUTPUT = Path("reports/latest.html")
+DEFAULT_OUTPUT = DATA_DIR / "reports/latest.html"
 
 
 def _load_trades(path: Path) -> List[Dict[str, str]]:
@@ -139,7 +140,7 @@ def generate_report(output_path: Path | None = None, config: BotConfig | None = 
 
     output = output_path or DEFAULT_OUTPUT
     if not output.is_absolute():
-        output = Path.cwd() / output
+        output = DATA_DIR / output
     output.parent.mkdir(parents=True, exist_ok=True)
 
     html = _build_html(cfg, trades, summary)
