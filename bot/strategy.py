@@ -78,6 +78,8 @@ class GridStrategy:
             ceil=self.band.vol_max,
         )
         self._last_clock_warning = 0.0
+        self.buy_pause_until = 0.0
+        self.buy_failure_streak = 0
 
         # 초기 기준가 및 변동성 설정
         quote = self.exchange.fetch_quote()
@@ -180,6 +182,12 @@ class GridStrategy:
         if idx >= self.band.max_steps or not self._can_place_order():
             return
 
+        now = time.time()
+        if now < self.buy_pause_until:
+            return
+        if self.buy_failure_streak and now - self.buy_pause_until > self.band.failure_pause_max:
+            self.buy_failure_streak = 0
+
         trigger_price = self._trigger_levels()[idx]
 
         # 현재가가 트리거 가격 이하로 내려왔을 때만 매수
@@ -199,6 +207,10 @@ class GridStrategy:
         order_id = self._ensure_order_id(result)
 
         if result.success:
+            self.buy_failure_streak = 0
+            pause = max(0.0, self.band.post_fill_pause_seconds)
+            if pause:
+                self.buy_pause_until = max(self.buy_pause_until, time.time() + pause)
             self.state.positions.append(Position(price=price, quantity=quantity))
             self.pending_orders[order_id] = {"time": time.time(), "side": "buy"}
             self._mark_order()
@@ -217,10 +229,21 @@ class GridStrategy:
                 position_units=total_units,
                 tp_ratio=self.tp_ratio,
                 sl_ratio=self.sl_ratio,
-                note=f"step={idx + 1}",
+                note={
+                    "step": idx + 1,
+                    "pause_seconds": pause,
+                },
                 order_id=order_id,
             )
         else:
+            self.buy_failure_streak += 1
+            pause = min(
+                self.band.failure_pause_max,
+                self.band.failure_pause_seconds
+                * (self.band.failure_pause_backoff ** max(0, self.buy_failure_streak - 1)),
+            )
+            if pause > 0:
+                self.buy_pause_until = max(self.buy_pause_until, time.time() + pause)
             self.logger.log_trade(
                 event="BUY_FAIL",
                 side="BUY",
@@ -232,7 +255,11 @@ class GridStrategy:
                 position_units=0.0,
                 tp_ratio=self.tp_ratio,
                 sl_ratio=self.sl_ratio,
-                note=str(result.raw),
+                note={
+                    "raw": result.raw,
+                    "pause_seconds": pause,
+                    "failures": self.buy_failure_streak,
+                },
                 order_id=order_id,
             )
 

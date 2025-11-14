@@ -7,7 +7,7 @@ import hmac
 import json
 import time
 import uuid
-from typing import Dict, Iterable, List
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 from urllib.parse import urlencode
 
 import requests
@@ -72,14 +72,18 @@ class BithumbExchange(Exchange):
     def _base_url(self) -> str:
         return self.config.bithumb.base_url.rstrip("/")
 
-    def _signed_headers(self, endpoint: str, body: str) -> Dict[str, str]:
+    def _rest_base_url(self) -> str:
+        base = self.config.bithumb.rest_base_url or self.config.bithumb.base_url
+        return base.rstrip("/")
+
+    def _signed_headers(self, endpoint: str, body: str, *, content_type: Optional[str] = None) -> Dict[str, str]:
         cred = self.config.bithumb
         headers: Dict[str, str] = {"Api-Client-Type": "2"}
         if cred.auth_mode.lower() == "jwt":
             headers.update(
                 {
                     "Authorization": f"Bearer {cred.api_key}",
-                    "Content-Type": "application/json",
+                    "Content-Type": content_type or "application/json",
                 }
             )
             return headers
@@ -93,59 +97,180 @@ class BithumbExchange(Exchange):
                 "Api-Key": cred.api_key,
                 "Api-Nonce": nonce,
                 "Api-Sign": signature,
-                "Content-Type": "application/x-www-form-urlencoded",
+                "Content-Type": content_type or "application/x-www-form-urlencoded",
             }
         )
         return headers
 
-    def _private_post(self, endpoint: str, params: Dict[str, str]) -> Dict[str, object]:
-        url = f"{self._base_url()}{endpoint}"
-        auth_mode = self.config.bithumb.auth_mode.lower()
+    def _format_http_error(self, exc: requests.HTTPError) -> Dict[str, object]:
+        payload: Dict[str, object] = {"status": "HTTP_ERROR", "message": str(exc)}
+        resp = exc.response
+        if resp is not None:
+            payload["http_status"] = resp.status_code
+            body_text = resp.text
+            payload["body"] = body_text
+            try:
+                body_json = resp.json()
+            except ValueError:
+                body_json = None
+            if isinstance(body_json, dict):
+                body_json = self._normalise_payload(body_json)
+                payload["body_json"] = body_json
+                status = body_json.get("status")
+                message = body_json.get("message")
+                if status and "remote_status" not in payload:
+                    payload["remote_status"] = status
+                if message and "remote_message" not in payload:
+                    payload["remote_message"] = message
+        return payload
+
+    def _attempt_post(
+        self,
+        *,
+        url: str,
+        endpoint: str,
+        body: str,
+        data: Optional[str],
+        json_payload: Optional[Dict[str, Any]],
+        content_type: str,
+    ) -> Tuple[bool, Dict[str, object]]:
+        headers = self._signed_headers(endpoint, body, content_type=content_type)
+        request_kwargs: Dict[str, Any] = {
+            "url": url,
+            "headers": headers,
+            "timeout": 7,
+        }
+        if data is not None:
+            request_kwargs["data"] = data
+        if json_payload is not None:
+            request_kwargs["json"] = json_payload
         try:
-            if auth_mode == "jwt":
-                headers = self._signed_headers(endpoint, "")
-                response = self._session.post(url, headers=headers, json=params, timeout=7)
-            else:
-                encoded = urlencode(params or {}, doseq=True)
-                headers = self._signed_headers(endpoint, encoded)
-                response = self._session.post(url, headers=headers, data=encoded, timeout=7)
+            response = self._session.post(**request_kwargs)
             response.raise_for_status()
-            return response.json()
+            payload = response.json()
+            if isinstance(payload, dict):
+                payload = self._normalise_payload(payload)
+            return True, payload
         except requests.HTTPError as exc:
-            payload: Dict[str, object] = {"status": "HTTP_ERROR", "message": str(exc)}
-            resp = exc.response
-            if resp is not None:
-                payload["http_status"] = resp.status_code
-                body_text = resp.text
-                payload["body"] = body_text
-                try:
-                    body_json = resp.json()
-                except ValueError:
-                    body_json = None
-                if isinstance(body_json, dict):
-                    payload["body_json"] = body_json
-                    status = body_json.get("status")
-                    message = body_json.get("message")
-                    if status and "remote_status" not in payload:
-                        payload["remote_status"] = status
-                    if message and "remote_message" not in payload:
-                        payload["remote_message"] = message
-            return payload
+            return False, self._format_http_error(exc)
         except requests.RequestException as exc:
-            return {"status": "HTTP_ERROR", "message": str(exc)}
+            return False, {"status": "HTTP_ERROR", "message": str(exc)}
         except ValueError as exc:
-            return {"status": "JSON_ERROR", "message": str(exc)}
+            return False, {"status": "JSON_ERROR", "message": str(exc)}
+
+    def _private_post(
+        self,
+        endpoint: str,
+        params: Dict[str, str],
+        *,
+        rest: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, object]:
+        legacy_variant = self._build_legacy_variant(endpoint, params)
+        rest_variant = self._build_rest_variant(rest) if rest else None
+        order: List[Dict[str, Any]] = []
+        if rest_variant is not None:
+            if self.config.bithumb.prefer_rest:
+                order.extend([rest_variant, legacy_variant])
+            else:
+                order.extend([legacy_variant, rest_variant])
+        else:
+            order.append(legacy_variant)
+
+        if not order:
+            return {"status": "HTTP_ERROR", "message": "Bithumb API endpoints are not configured."}
+
+        if not self.config.bithumb.enable_failover and order:
+            order = order[:1]
+
+        attempts: List[Dict[str, object]] = []
+        for variant in order:
+            success, payload = self._attempt_post(**variant)
+            if success:
+                if attempts and isinstance(payload, dict):
+                    payload = dict(payload)
+                    payload.setdefault("failover_history", attempts)
+                return payload
+            attempt_payload = dict(payload)
+            attempt_payload.setdefault("api_version", variant.get("name", "legacy"))
+            attempt_payload.setdefault("endpoint", variant.get("endpoint", ""))
+            attempts.append(attempt_payload)
+            if not self.config.bithumb.enable_failover:
+                return payload
+
+        if attempts:
+            return {
+                "status": "HTTP_ERROR",
+                "message": "모든 Bithumb API 시도가 실패했습니다.",
+                "failover_history": attempts,
+            }
+        return {"status": "HTTP_ERROR", "message": "요청이 실패했습니다."}
+
+    def _build_legacy_variant(self, endpoint: str, params: Dict[str, str]) -> Dict[str, Any]:
+        encoded = urlencode(params or {}, doseq=True)
+        return {
+            "name": "legacy",
+            "url": f"{self._base_url()}{endpoint}",
+            "endpoint": endpoint,
+            "body": encoded,
+            "data": encoded,
+            "json_payload": None,
+            "content_type": "application/x-www-form-urlencoded",
+        }
+
+    def _build_rest_variant(self, rest: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        endpoint = str(rest.get("endpoint") or "").strip()
+        if not endpoint:
+            return None
+        params = dict(rest.get("params") or {})
+        body = json.dumps(params, ensure_ascii=False, separators=(",", ":"))
+        auth_mode = self.config.bithumb.auth_mode.lower()
+        if auth_mode == "jwt":
+            data = None
+            json_payload: Optional[Dict[str, Any]] = params
+        else:
+            data = body
+            json_payload = None
+        return {
+            "name": "rest",
+            "url": f"{self._rest_base_url()}{endpoint}",
+            "endpoint": endpoint,
+            "body": body,
+            "data": data,
+            "json_payload": json_payload,
+            "content_type": "application/json",
+        }
+
+    def _normalise_payload(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        if "status" not in payload and "code" in payload:
+            payload.setdefault("status", payload.get("code"))
+        if "message" not in payload and "msg" in payload:
+            payload.setdefault("message", payload.get("msg"))
+        if "order_id" not in payload:
+            order_id = payload.get("orderId") or payload.get("orderid")
+            if order_id:
+                payload.setdefault("order_id", order_id)
+        return payload
 
     def _apply_hint(self, payload: Dict[str, object]) -> Dict[str, object]:
         status = str(payload.get("status", ""))
         if status in ERROR_HINTS and "hint" not in payload:
             payload = dict(payload)
             payload["hint"] = ERROR_HINTS[status]
-            return payload
         remote_status = str(payload.get("remote_status", ""))
         if remote_status in ERROR_HINTS and "hint" not in payload:
             payload = dict(payload)
             payload["hint"] = ERROR_HINTS[remote_status]
+        history = payload.get("failover_history")
+        if isinstance(history, list):
+            enriched: List[Dict[str, object]] = []
+            for entry in history:
+                if isinstance(entry, dict):
+                    enriched.append(self._apply_hint(entry))
+                else:
+                    enriched.append(entry)
+            if enriched != history:
+                payload = dict(payload)
+                payload["failover_history"] = enriched
         return payload
 
     # ------------------------------------------------------------------
@@ -206,7 +331,31 @@ class BithumbExchange(Exchange):
                 "type": "bid" if is_buy else "ask",
             }
 
-        payload = self._private_post(endpoint, params)
+        rest_payload: Optional[Dict[str, Any]] = None
+        if self.config.bithumb.rest_place_endpoint:
+            rest_params = {
+                "symbol": self._rest_symbol(),
+                "side": "BUY" if is_buy else "SELL",
+                "type": "market" if self.config.bot.use_market_orders else "limit",
+                "order_type": "market" if self.config.bot.use_market_orders else "limit",
+                "price": str(int(round(price))) if not self.config.bot.use_market_orders else None,
+                "quantity": f"{quantity:.8f}",
+                "units": f"{quantity:.8f}",
+                "volume": f"{quantity:.8f}",
+                "order_currency": self.config.bot.order_currency,
+                "payment_currency": self.config.bot.payment_currency,
+            }
+            rest_params = {k: v for k, v in rest_params.items() if v is not None}
+            rest_endpoint = (
+                self.config.bithumb.rest_market_buy_endpoint
+                if self.config.bot.use_market_orders and is_buy
+                else self.config.bithumb.rest_market_sell_endpoint
+                if self.config.bot.use_market_orders and not is_buy
+                else self.config.bithumb.rest_place_endpoint
+            )
+            rest_payload = {"endpoint": rest_endpoint, "params": rest_params}
+
+        payload = self._private_post(endpoint, params, rest=rest_payload)
         payload = self._apply_hint(payload)
         status = str(payload.get("status")) if isinstance(payload, dict) else ""
         success = status == "0000"
@@ -268,6 +417,14 @@ class BithumbExchange(Exchange):
     def min_notional(self) -> float:
         # 최소 주문 금액 (KRW 기준). 필요시 config로 뺄 수 있음.
         return 5000.0
+
+    def _rest_symbol(self) -> str:
+        symbol = self.config.bot.symbol_ticker
+        if self.config.bithumb.rest_symbol_dash:
+            symbol = symbol.replace("_", "-")
+        if self.config.bithumb.rest_symbol_upper:
+            symbol = symbol.upper()
+        return symbol
 
 
 __all__ = ["BithumbExchange"]

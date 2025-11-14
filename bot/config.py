@@ -120,6 +120,14 @@ class BithumbSettings:
     api_key: str = ""
     api_secret: str = ""
     base_url: str = "https://api.bithumb.com"
+    rest_base_url: str = "https://api.bithumb.com"
+    rest_place_endpoint: str = "/api/v2/spot/trade/place"
+    rest_market_buy_endpoint: str = "/api/v2/spot/trade/market_buy"
+    rest_market_sell_endpoint: str = "/api/v2/spot/trade/market_sell"
+    prefer_rest: bool = False
+    enable_failover: bool = True
+    rest_symbol_dash: bool = True
+    rest_symbol_upper: bool = True
     auth_mode: str = "legacy"  # "legacy" | "jwt"
 
 
@@ -160,6 +168,10 @@ class StrategyBand:
     cancel_min_wait: float
     cancel_max_wait: float
     cancel_volume_scale: float
+    failure_pause_seconds: float
+    failure_pause_backoff: float
+    failure_pause_max: float
+    post_fill_pause_seconds: float
 
 
 @dataclass
@@ -309,6 +321,10 @@ class BotConfig:
                 cancel_min_wait=f("cancel_min_wait", defaults["CANCEL_MIN_WAIT"]),
                 cancel_max_wait=f("cancel_max_wait", defaults["CANCEL_MAX_WAIT"]),
                 cancel_volume_scale=f("cancel_vol_scale", defaults["CANCEL_VOL_SCALE"]),
+                failure_pause_seconds=f("failure_pause_seconds", defaults["FAILURE_PAUSE_SECONDS"]),
+                failure_pause_backoff=f("failure_pause_backoff", defaults["FAILURE_PAUSE_BACKOFF"]),
+                failure_pause_max=f("failure_pause_max", defaults["FAILURE_PAUSE_MAX"]),
+                post_fill_pause_seconds=f("post_fill_pause_seconds", defaults["POST_FILL_PAUSE_SECONDS"]),
             )
 
         default_defaults = {
@@ -330,6 +346,10 @@ class BotConfig:
             "CANCEL_MIN_WAIT": 5.0,
             "CANCEL_MAX_WAIT": 30.0,
             "CANCEL_VOL_SCALE": 2000.0,
+            "FAILURE_PAUSE_SECONDS": 10.0,
+            "FAILURE_PAUSE_BACKOFF": 2.0,
+            "FAILURE_PAUSE_MAX": 180.0,
+            "POST_FILL_PAUSE_SECONDS": 3.0,
         }
         hf_defaults = {
             "BUY_STEP": 0.005,
@@ -350,6 +370,10 @@ class BotConfig:
             "CANCEL_MIN_WAIT": 5.0,
             "CANCEL_MAX_WAIT": 30.0,
             "CANCEL_VOL_SCALE": 2000.0,
+            "FAILURE_PAUSE_SECONDS": 8.0,
+            "FAILURE_PAUSE_BACKOFF": 2.0,
+            "FAILURE_PAUSE_MAX": 120.0,
+            "POST_FILL_PAUSE_SECONDS": 2.0,
         }
 
         strategy = GridStrategySettings(
@@ -360,7 +384,15 @@ class BotConfig:
         bithumb = BithumbSettings(
             api_key=str(_select(source_env, ["BITHUMB_API_KEY"], bithumb_section.get("api_key", ""))),
             api_secret=str(_select(source_env, ["BITHUMB_API_SECRET"], bithumb_section.get("api_secret", ""))),
-            base_url=str(_select(source_env, ["BITHUMB_BASE_URL"], bithumb_section.get("base_url", "https://api.bithumb.com"))),
+            base_url=str(_select(source_env, ["BITHUMB_BASE_URL", "BITHUMB_LEGACY_BASE_URL"], bithumb_section.get("base_url", "https://api.bithumb.com"))),
+            rest_base_url=str(_select(source_env, ["BITHUMB_REST_BASE_URL"], bithumb_section.get("rest_base_url", bithumb_section.get("base_url", "https://api.bithumb.com")))),
+            rest_place_endpoint=str(_select(source_env, ["BITHUMB_REST_PLACE_ENDPOINT"], bithumb_section.get("rest_place_endpoint", "/api/v2/spot/trade/place"))),
+            rest_market_buy_endpoint=str(_select(source_env, ["BITHUMB_REST_MARKET_BUY"], bithumb_section.get("rest_market_buy_endpoint", "/api/v2/spot/trade/market_buy"))),
+            rest_market_sell_endpoint=str(_select(source_env, ["BITHUMB_REST_MARKET_SELL"], bithumb_section.get("rest_market_sell_endpoint", "/api/v2/spot/trade/market_sell"))),
+            prefer_rest=_as_bool(_select(source_env, ["BITHUMB_PREFER_REST"], bithumb_section.get("prefer_rest", False)), False),
+            enable_failover=_as_bool(_select(source_env, ["BITHUMB_FAILOVER"], bithumb_section.get("enable_failover", True)), True),
+            rest_symbol_dash=_as_bool(_select(source_env, ["BITHUMB_REST_SYMBOL_DASH"], bithumb_section.get("rest_symbol_dash", True)), True),
+            rest_symbol_upper=_as_bool(_select(source_env, ["BITHUMB_REST_SYMBOL_UPPER"], bithumb_section.get("rest_symbol_upper", True)), True),
             auth_mode=str(_select(source_env, ["BITHUMB_AUTH_MODE"], bithumb_section.get("auth_mode", "legacy"))).lower(),
         )
 

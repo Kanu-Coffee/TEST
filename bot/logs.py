@@ -2,11 +2,12 @@
 from __future__ import annotations
 
 import csv
+import json
 import shutil
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Mapping, Sequence
 
 from .config import BotConfig
 from .paths import DATA_DIR, LEGACY_DATA_DIR
@@ -57,9 +58,10 @@ class TradeLogger:
         position_units: float,
         tp_ratio: float,
         sl_ratio: float,
-        note: str = "",
+        note: object = "",
         order_id: str = "",
     ) -> None:
+        note_text = self._serialise_note(note)
         row = [
             _timestamp(),
             event,
@@ -72,7 +74,7 @@ class TradeLogger:
             f"{position_units:.6f}",
             f"{tp_ratio:.5f}",
             f"{sl_ratio:.5f}",
-            note,
+            note_text,
             order_id,
         ]
         with self.paths.trade_log.open("a", newline="", encoding="utf-8") as handle:
@@ -177,6 +179,26 @@ class TradeLogger:
                         int(row["loss"]),
                     ]
                 )
+
+    def _serialise_note(self, note: object) -> str:
+        if isinstance(note, str):
+            return note
+        if isinstance(note, (int, float)):
+            return str(note)
+        if isinstance(note, Mapping):
+            try:
+                return json.dumps(note, ensure_ascii=False, sort_keys=True)
+            except (TypeError, ValueError):
+                pass
+        if isinstance(note, Sequence) and not isinstance(note, (bytes, bytearray)):
+            try:
+                return json.dumps(list(note), ensure_ascii=False)
+            except (TypeError, ValueError):
+                pass
+        try:
+            return json.dumps(note, ensure_ascii=False)
+        except (TypeError, ValueError):
+            return str(note)
 
 
 __all__ = ["TradeLogger", "TradeLogPaths", "DATA_DIR"]

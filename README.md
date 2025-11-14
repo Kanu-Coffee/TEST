@@ -13,6 +13,9 @@
 - 🌐 **Multi-Exchange**
   - `BITHUMB` – 코인 현물 (예: USDT_KRW, BTC_KRW)
   - `KIS` – 미국 주식/ETF (예: TQQQ)
+- 🔁 **Bithumb API Failover**
+  - 레거시 v1.2.0 엔드포인트와 v2.1.0 REST 엔드포인트를 자동 페일오버
+  - HTTP 4xx/5xx 또는 서명 오류가 발생하면 즉시 대체 경로로 재시도
 - 🏠 **Home Assistant Add-on**
   - 애드온으로 설치 후 UI에서 파라미터 설정
   - 포트 `6443` 의 웹 게이트웨이 제공 (선택)
@@ -72,6 +75,8 @@ cp config/bot_config.example.yaml config/bot_config.yaml
    - `bithumb.api_key`, `bithumb.api_secret` 또는 KIS 키
    - 전략 관련 파라미터 (`buy_step`, `max_steps`, `martingale_multiplier` 등)
    - 필요하면 `base_reset_minutes` (예: 1440분 = 24시간)
+   - Bithumb API 페일오버 설정 (`bithumb.prefer_rest`, `bithumb.enable_failover`)
+   - 주문 실패 일시정지 조정 (`strategy.*.failure_pause_seconds`, `failure_pause_backoff` 등)
 
 3. dry-run 으로 실행
 
@@ -129,12 +134,21 @@ http://<HA_LOCAL_IP>:6443/
   - `vol_halflife`, `vol_min`, `vol_max`
   - `sleep_seconds`, `order_cooldown`, `max_orders_per_minute`
   - `cancel_*`: 미체결 주문 취소 타이밍 제어
+  - `failure_pause_seconds`, `failure_pause_backoff`, `failure_pause_max`: 주문 실패 시 자동 일시정지 백오프
+  - `post_fill_pause_seconds`: 체결 후 잠깐 쉬어가기
 
 - **기준가 리셋**
 
   - `base_reset_minutes`
     - N분 동안 매수 체결이 없으면 `base` 를 현재 가격으로 리셋
     - 환경변수: `BASE_RESET_MINUTES` (또는 `BOT_BASE_RESET_MINUTES`)
+
+- **Bithumb API 페일오버**
+
+  - `bithumb.rest_*_endpoint`: v2.1.0 REST 경로 (기본 제공값 사용 가능)
+  - `bithumb.prefer_rest`: `true` → REST 우선, `false` → 레거시 우선
+  - `bithumb.enable_failover`: `true` 면 실패 시 다른 버전으로 자동 재시도
+  - `bithumb.rest_symbol_dash/rest_symbol_upper`: 심볼 표기 형태 조정
 
 자세한 설명은 `docs/USER_GUIDE.md` 를 참고하세요.
 
