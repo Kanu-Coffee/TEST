@@ -120,10 +120,12 @@ class BithumbSettings:
     api_key: str = ""
     api_secret: str = ""
     base_url: str = "https://api.bithumb.com"
-    rest_base_url: str = "https://global-openapi.bithumb.com"
-    rest_place_endpoint: str = "/api/v2/spot/trade/place"
-    rest_market_buy_endpoint: str = "/api/v2/spot/trade/market_buy"
-    rest_market_sell_endpoint: str = "/api/v2/spot/trade/market_sell"
+    # ⚠️ REST v2.1.0 엔드포인트는 공식 문서에 없음 (빌미 API 문서: v1.2.0만 사용)
+    # 모두 빈 문자열로 설정하면 Legacy API(api.bithumb.com)만 사용됨
+    rest_base_url: str = ""  # 빈 값 → _rest_base_url()에서 base_url 사용
+    rest_place_endpoint: str = ""  # 빈 값 → place_order()에서 REST 스킵
+    rest_market_buy_endpoint: str = ""  # 빈 값 → place_order()에서 REST 스킵
+    rest_market_sell_endpoint: str = ""  # 빈 값 → place_order()에서 REST 스킵
     prefer_rest: bool = False
     enable_failover: bool = True
     rest_symbol_dash: bool = True
@@ -413,35 +415,34 @@ class BotConfig:
                     bithumb_section.get("base_url", "https://api.bithumb.com"),
                 )
             ).strip(),
+            # ⚠️ REST v2.1.0 엔드포인트는 비활성화 (기본값: 빈 문자열)
+            # 공식 Bithumb v1.2.0 API 문서에만 endpoint가 문서화됨
             rest_base_url=str(
                 _select(
                     source_env,
                     ["BITHUMB_REST_BASE_URL"],
-                    bithumb_section.get(
-                        "rest_base_url",
-                        bithumb_section.get("base_url", "https://global-openapi.bithumb.com"),
-                    ),
+                    bithumb_section.get("rest_base_url", ""),  # 빈 값 = Legacy API 사용
                 )
             ).strip(),
             rest_place_endpoint=str(
                 _select(
                     source_env,
                     ["BITHUMB_REST_PLACE_ENDPOINT"],
-                    bithumb_section.get("rest_place_endpoint", "/api/v2/spot/trade/place"),
+                    bithumb_section.get("rest_place_endpoint", ""),  # 빈 값 = REST 스킵
                 )
             ).strip(),
             rest_market_buy_endpoint=str(
                 _select(
                     source_env,
                     ["BITHUMB_REST_MARKET_BUY"],
-                    bithumb_section.get("rest_market_buy_endpoint", "/api/v2/spot/trade/market_buy"),
+                    bithumb_section.get("rest_market_buy_endpoint", ""),  # 빈 값 = REST 스킵
                 )
             ).strip(),
             rest_market_sell_endpoint=str(
                 _select(
                     source_env,
                     ["BITHUMB_REST_MARKET_SELL"],
-                    bithumb_section.get("rest_market_sell_endpoint", "/api/v2/spot/trade/market_sell"),
+                    bithumb_section.get("rest_market_sell_endpoint", ""),  # 빈 값 = REST 스킵
                 )
             ).strip(),
             prefer_rest=_as_bool(_select(source_env, ["BITHUMB_PREFER_REST"], bithumb_section.get("prefer_rest", False)), False),
@@ -453,14 +454,10 @@ class BotConfig:
 
         if not bithumb.base_url:
             bithumb.base_url = "https://api.bithumb.com"
-        if not bithumb.rest_base_url:
-            bithumb.rest_base_url = bithumb.base_url
-        if not bithumb.rest_place_endpoint:
-            bithumb.rest_place_endpoint = "/api/v2/spot/trade/place"
-        if not bithumb.rest_market_buy_endpoint:
-            bithumb.rest_market_buy_endpoint = "/api/v2/spot/trade/market_buy"
-        if not bithumb.rest_market_sell_endpoint:
-            bithumb.rest_market_sell_endpoint = "/api/v2/spot/trade/market_sell"
+        # REST 엔드포인트가 비어있으면 자동으로 legacy API만 사용됨
+        # - rest_base_url 비어있음 → _rest_base_url()에서 base_url 사용
+        # - rest_place_endpoint 비어있음 → place_order()에서 REST 스킵
+        # 따라서 추가 초기화 불필요 (빈 값이 의도된 설정임)
 
         kis = KisSettings(
             app_key=str(_select(source_env, ["KIS_APP_KEY"], kis_section.get("app_key", ""))),
