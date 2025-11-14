@@ -133,6 +133,7 @@ class BithumbExchange(Exchange):
         data: Optional[str],
         json_payload: Optional[Dict[str, Any]],
         content_type: str,
+        **_: Any,
     ) -> Tuple[bool, Dict[str, object]]:
         headers = self._signed_headers(endpoint, body, content_type=content_type)
         request_kwargs: Dict[str, Any] = {
