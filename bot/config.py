@@ -120,6 +120,14 @@ class BithumbSettings:
     api_key: str = ""
     api_secret: str = ""
     base_url: str = "https://api.bithumb.com"
+    rest_base_url: str = "https://api.bithumb.com"
+    rest_place_endpoint: str = "/api/v2/spot/trade/place"
+    rest_market_buy_endpoint: str = "/api/v2/spot/trade/market_buy"
+    rest_market_sell_endpoint: str = "/api/v2/spot/trade/market_sell"
+    prefer_rest: bool = False
+    enable_failover: bool = True
+    rest_symbol_dash: bool = True
+    rest_symbol_upper: bool = True
     auth_mode: str = "legacy"  # "legacy" | "jwt"
 
 
@@ -160,6 +168,10 @@ class StrategyBand:
     cancel_min_wait: float
     cancel_max_wait: float
     cancel_volume_scale: float
+    failure_pause_seconds: float
+    failure_pause_backoff: float
+    failure_pause_max: float
+    post_fill_pause_seconds: float
 
 
 @dataclass
@@ -176,6 +188,8 @@ class BotSettings:
     payment_currency: str = "KRW"
     dry_run: bool = True
     hf_mode: bool = True
+    use_market_orders: bool = False
+    base_reset_minutes: int = 15
     timezone: str = "Asia/Seoul"
     report_interval_minutes: int = 60
     log_level: str = "INFO"
@@ -251,10 +265,32 @@ class BotConfig:
             payment_currency=str(_select(source_env, ["BOT_PAYMENT_CURRENCY", "PAYMENT_CURRENCY"], bot_section.get("payment_currency", "KRW"))),
             dry_run=_as_bool(_select(source_env, ["BOT_DRY_RUN", "DRY_RUN"], bot_section.get("dry_run", True)), True),
             hf_mode=_as_bool(_select(source_env, ["BOT_HF_MODE", "HF_MODE"], bot_section.get("hf_mode", True)), True),
+            use_market_orders=_as_bool(_select(source_env, ["BOT_USE_MARKET_ORDERS", "USE_MARKET_ORDERS"], bot_section.get("use_market_orders", False)), False),
+            base_reset_minutes=max(
+                0,
+                _as_int(
+                    _select(
+                        source_env,
+                        ["BASE_RESET_MINUTES", "BOT_BASE_RESET_MINUTES"],
+                        bot_section.get("base_reset_minutes", 15),
+                    ),
+                    15,
+                ),
+            ),
             timezone=str(_select(source_env, ["TIMEZONE"], bot_section.get("timezone", "Asia/Seoul"))),
             report_interval_minutes=_as_int(_select(source_env, ["REPORT_INTERVAL_MINUTES"], bot_section.get("report_interval_minutes", 60)), 60),
             log_level=str(_select(source_env, ["LOG_LEVEL"], bot_section.get("log_level", "INFO"))).upper(),
         )
+
+        # Legacy override: allow BASE_RESET_HOURS to convert into minutes if provided
+        legacy_hours = _select(source_env, ["BASE_RESET_HOURS", "BOT_BASE_RESET_HOURS"], bot_section.get("base_reset_hours"))
+        if legacy_hours not in (None, ""):
+            try:
+                hours_val = float(legacy_hours)
+            except (TypeError, ValueError):
+                hours_val = None
+            if hours_val is not None and hours_val >= 0:
+                bot.base_reset_minutes = max(0, int(hours_val * 60))
 
         def build_band(prefix: str, section: Mapping[str, Any], defaults: Dict[str, Any]) -> StrategyBand:
             env_prefix = prefix.upper()
@@ -307,6 +343,10 @@ class BotConfig:
                 cancel_min_wait=f("cancel_min_wait", defaults["CANCEL_MIN_WAIT"]),
                 cancel_max_wait=f("cancel_max_wait", defaults["CANCEL_MAX_WAIT"]),
                 cancel_volume_scale=f("cancel_vol_scale", defaults["CANCEL_VOL_SCALE"]),
+                failure_pause_seconds=f("failure_pause_seconds", defaults["FAILURE_PAUSE_SECONDS"]),
+                failure_pause_backoff=f("failure_pause_backoff", defaults["FAILURE_PAUSE_BACKOFF"]),
+                failure_pause_max=f("failure_pause_max", defaults["FAILURE_PAUSE_MAX"]),
+                post_fill_pause_seconds=f("post_fill_pause_seconds", defaults["POST_FILL_PAUSE_SECONDS"]),
             )
 
         default_defaults = {
@@ -328,6 +368,10 @@ class BotConfig:
             "CANCEL_MIN_WAIT": 5.0,
             "CANCEL_MAX_WAIT": 30.0,
             "CANCEL_VOL_SCALE": 2000.0,
+            "FAILURE_PAUSE_SECONDS": 10.0,
+            "FAILURE_PAUSE_BACKOFF": 2.0,
+            "FAILURE_PAUSE_MAX": 180.0,
+            "POST_FILL_PAUSE_SECONDS": 3.0,
         }
         hf_defaults = {
             "BUY_STEP": 0.005,
@@ -348,6 +392,10 @@ class BotConfig:
             "CANCEL_MIN_WAIT": 5.0,
             "CANCEL_MAX_WAIT": 30.0,
             "CANCEL_VOL_SCALE": 2000.0,
+            "FAILURE_PAUSE_SECONDS": 8.0,
+            "FAILURE_PAUSE_BACKOFF": 2.0,
+            "FAILURE_PAUSE_MAX": 120.0,
+            "POST_FILL_PAUSE_SECONDS": 2.0,
         }
 
         strategy = GridStrategySettings(
@@ -356,11 +404,60 @@ class BotConfig:
         )
 
         bithumb = BithumbSettings(
-            api_key=str(_select(source_env, ["BITHUMB_API_KEY"], bithumb_section.get("api_key", ""))),
-            api_secret=str(_select(source_env, ["BITHUMB_API_SECRET"], bithumb_section.get("api_secret", ""))),
-            base_url=str(_select(source_env, ["BITHUMB_BASE_URL"], bithumb_section.get("base_url", "https://api.bithumb.com"))),
+            api_key=str(_select(source_env, ["BITHUMB_API_KEY"], bithumb_section.get("api_key", ""))).strip(),
+            api_secret=str(_select(source_env, ["BITHUMB_API_SECRET"], bithumb_section.get("api_secret", ""))).strip(),
+            base_url=str(
+                _select(
+                    source_env,
+                    ["BITHUMB_BASE_URL", "BITHUMB_LEGACY_BASE_URL"],
+                    bithumb_section.get("base_url", "https://api.bithumb.com"),
+                )
+            ).strip(),
+            rest_base_url=str(
+                _select(
+                    source_env,
+                    ["BITHUMB_REST_BASE_URL"],
+                    bithumb_section.get("rest_base_url", bithumb_section.get("base_url", "https://api.bithumb.com")),
+                )
+            ).strip(),
+            rest_place_endpoint=str(
+                _select(
+                    source_env,
+                    ["BITHUMB_REST_PLACE_ENDPOINT"],
+                    bithumb_section.get("rest_place_endpoint", "/api/v2/spot/trade/place"),
+                )
+            ).strip(),
+            rest_market_buy_endpoint=str(
+                _select(
+                    source_env,
+                    ["BITHUMB_REST_MARKET_BUY"],
+                    bithumb_section.get("rest_market_buy_endpoint", "/api/v2/spot/trade/market_buy"),
+                )
+            ).strip(),
+            rest_market_sell_endpoint=str(
+                _select(
+                    source_env,
+                    ["BITHUMB_REST_MARKET_SELL"],
+                    bithumb_section.get("rest_market_sell_endpoint", "/api/v2/spot/trade/market_sell"),
+                )
+            ).strip(),
+            prefer_rest=_as_bool(_select(source_env, ["BITHUMB_PREFER_REST"], bithumb_section.get("prefer_rest", False)), False),
+            enable_failover=_as_bool(_select(source_env, ["BITHUMB_FAILOVER"], bithumb_section.get("enable_failover", True)), True),
+            rest_symbol_dash=_as_bool(_select(source_env, ["BITHUMB_REST_SYMBOL_DASH"], bithumb_section.get("rest_symbol_dash", True)), True),
+            rest_symbol_upper=_as_bool(_select(source_env, ["BITHUMB_REST_SYMBOL_UPPER"], bithumb_section.get("rest_symbol_upper", True)), True),
             auth_mode=str(_select(source_env, ["BITHUMB_AUTH_MODE"], bithumb_section.get("auth_mode", "legacy"))).lower(),
         )
+
+        if not bithumb.base_url:
+            bithumb.base_url = "https://api.bithumb.com"
+        if not bithumb.rest_base_url:
+            bithumb.rest_base_url = bithumb.base_url
+        if not bithumb.rest_place_endpoint:
+            bithumb.rest_place_endpoint = "/api/v2/spot/trade/place"
+        if not bithumb.rest_market_buy_endpoint:
+            bithumb.rest_market_buy_endpoint = "/api/v2/spot/trade/market_buy"
+        if not bithumb.rest_market_sell_endpoint:
+            bithumb.rest_market_sell_endpoint = "/api/v2/spot/trade/market_sell"
 
         kis = KisSettings(
             app_key=str(_select(source_env, ["KIS_APP_KEY"], kis_section.get("app_key", ""))),
@@ -432,6 +529,8 @@ class BotConfig:
             ("BOT_PAYMENT_CURRENCY", self.bot.payment_currency),
             ("BOT_DRY_RUN", str(self.bot.dry_run).lower()),
             ("BOT_HF_MODE", str(self.bot.hf_mode).lower()),
+            ("BOT_USE_MARKET_ORDERS", str(self.bot.use_market_orders).lower()),
+            ("BASE_RESET_MINUTES", str(self.bot.base_reset_minutes)),
             ("TIMEZONE", self.bot.timezone),
             ("REPORT_INTERVAL_MINUTES", str(self.bot.report_interval_minutes)),
             ("LOG_LEVEL", self.bot.log_level),
