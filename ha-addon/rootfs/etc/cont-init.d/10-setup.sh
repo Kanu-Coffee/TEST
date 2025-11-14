@@ -19,6 +19,14 @@ DEFAULT_MARTINGALE="$(bashio::config 'default_martingale_mul')"
 DEFAULT_STEPS="$(bashio::config 'default_max_steps')"
 HF_BASE="$(bashio::config 'hf_base_order_value')"
 HF_STEP="$(bashio::config 'hf_buy_step')"
+# Timezone 설정 (봇용 + 컨테이너용)
+BOT_TZ="$(bashio::config 'bot_timezone' 'Asia/Seoul')"
+SYS_TZ="$(bashio::config 'tz' "${BOT_TZ}")"
+
+# 컨테이너 환경변수 TZ 설정
+export TZ="${SYS_TZ}"
+
+
 HF_MARTINGALE="$(bashio::config 'hf_martingale_mul')"
 HF_STEPS="$(bashio::config 'hf_max_steps')"
 BITHUMB_API_KEY="$(bashio::config 'bithumb_api_key')"
