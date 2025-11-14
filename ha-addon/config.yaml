@@ -31,9 +31,7 @@ options:
   bot_payment_currency: KRW
   bot_dry_run: false
   bot_hf_mode: true
-  use_market_orders: true
-  bot_timezone: Asia/Seoul
-  tz: Asia/Seoul
+  base_reset_minutes: 15
   default_base_order_value: 5000
   default_buy_step: 0.008
   default_martingale_mul: 1.5
@@ -67,9 +65,7 @@ schema:
   bot_payment_currency: str
   bot_dry_run: bool
   bot_hf_mode: bool
-  use_market_orders: bool
-  bot_timezone: str
-  tz: str
+  base_reset_minutes: int
   default_base_order_value: float
   default_buy_step: float
   default_martingale_mul: float

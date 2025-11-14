@@ -74,7 +74,7 @@ cp config/bot_config.example.yaml config/bot_config.yaml
    - `exchange`, `symbol_ticker`
    - `bithumb.api_key`, `bithumb.api_secret` 또는 KIS 키
    - 전략 관련 파라미터 (`buy_step`, `max_steps`, `martingale_multiplier` 등)
-   - 필요하면 `base_reset_minutes` (예: 1440분 = 24시간)
+   - 필요하면 `base_reset_minutes` (예: 15분 기본값)
    - Bithumb API 페일오버 설정 (`bithumb.prefer_rest`, `bithumb.enable_failover`)
    - 주문 실패 일시정지 조정 (`strategy.*.failure_pause_seconds`, `failure_pause_backoff` 등)
 
@@ -140,8 +140,15 @@ http://<HA_LOCAL_IP>:6443/
 - **기준가 리셋**
 
   - `base_reset_minutes`
-    - N분 동안 매수 체결이 없으면 `base` 를 현재 가격으로 리셋
-    - 환경변수: `BASE_RESET_MINUTES` (또는 `BOT_BASE_RESET_MINUTES`)
+    - N분 동안 기준가가 변하지 않으면 현재가로 자동 리셋 (기본 15분)
+    - 환경변수: `BASE_RESET_MINUTES` (또는 `BOT_BASE_RESET_MINUTES`), 기존 `BASE_RESET_HOURS`도 지원
+
+- **Bithumb API 페일오버**
+
+  - `bithumb.rest_*_endpoint`: v2.1.0 REST 경로 (기본 제공값 사용 가능)
+  - `bithumb.prefer_rest`: `true` → REST 우선, `false` → 레거시 우선
+  - `bithumb.enable_failover`: `true` 면 실패 시 다른 버전으로 자동 재시도
+  - `bithumb.rest_symbol_dash/rest_symbol_upper`: 심볼 표기 형태 조정
 
 - **Bithumb API 페일오버**
 

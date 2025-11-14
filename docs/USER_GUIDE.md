@@ -87,7 +87,7 @@ bot:
   timezone: Asia/Seoul
   report_interval_minutes: 60
   log_level: INFO
-  base_reset_minutes: 1440  # 선택: N분 동안 매수 없으면 기준가(base) 리셋
+  base_reset_minutes: 15    # 선택: N분 동안 기준가가 그대로면 현재가로 리셋
 ```
 
 - **exchange**
@@ -100,10 +100,10 @@ bot:
   - `true`  : 고빈도(HF) 밴드 파라미터 사용
   - `false` : 기본(default) 밴드 사용
 - **base_reset_minutes**
-  - 최근 **매수 체결이 없는 시간이 N분을 넘으면** 기준가(`base`) 를 현재 가격으로 재설정  
-  - 장이 한 방향으로만 오래 가서 그리드가 전혀 체결되지 않는 상황 방지
-  - 기본값 1440분 = 24시간  
-  - 환경변수: `BASE_RESET_MINUTES` 또는 `BOT_BASE_RESET_MINUTES`
+  - 최근 **기준가가 N분 동안 그대로면** 현재 가격으로 기준가(`base`)를 재설정합니다.
+  - 장이 한 방향으로만 오래 가서 그리드가 전혀 체결되지 않는 상황을 방지합니다.
+  - 기본값 15분이며 환경변수 `BASE_RESET_MINUTES` 또는 `BOT_BASE_RESET_MINUTES`로 조정할 수 있습니다.
+  - 기존 버전과 호환을 위해 `BASE_RESET_HOURS` (시 단위)도 인식합니다.
 
 ### 4.2 거래소별 인증 설정
 
@@ -284,8 +284,8 @@ sl = max(sl_floor,  vol * sl_multiplier)
    - `base = min(base, avg_price)`  
      → 평단이 내려갈수록 기준가도 함께 내려가지만, 평단이 올라가면 기준가는 그대로여서  
        그리드가 위로 따라 올라가 **추격 매수**는 하지 않음.
-4. `base_reset_minutes` 만큼 매수 체결이 없다면  
-   - `base` 를 현재 가격으로 다시 설정 → 새로운 구간에서 다시 그리드 구축
+4. `base_reset_minutes` 만큼 기준가가 유지되면
+   - 포지션이 없을 때 현재가로 기준가를 다시 설정 → 새로운 구간에서 다시 그리드 구축
 
 ### 6.2 매수 조건
 

@@ -189,6 +189,7 @@ class BotSettings:
     dry_run: bool = True
     hf_mode: bool = True
     use_market_orders: bool = False
+    base_reset_minutes: int = 15
     timezone: str = "Asia/Seoul"
     report_interval_minutes: int = 60
     log_level: str = "INFO"
@@ -265,10 +266,31 @@ class BotConfig:
             dry_run=_as_bool(_select(source_env, ["BOT_DRY_RUN", "DRY_RUN"], bot_section.get("dry_run", True)), True),
             hf_mode=_as_bool(_select(source_env, ["BOT_HF_MODE", "HF_MODE"], bot_section.get("hf_mode", True)), True),
             use_market_orders=_as_bool(_select(source_env, ["BOT_USE_MARKET_ORDERS", "USE_MARKET_ORDERS"], bot_section.get("use_market_orders", False)), False),
+            base_reset_minutes=max(
+                0,
+                _as_int(
+                    _select(
+                        source_env,
+                        ["BASE_RESET_MINUTES", "BOT_BASE_RESET_MINUTES"],
+                        bot_section.get("base_reset_minutes", 15),
+                    ),
+                    15,
+                ),
+            ),
             timezone=str(_select(source_env, ["TIMEZONE"], bot_section.get("timezone", "Asia/Seoul"))),
             report_interval_minutes=_as_int(_select(source_env, ["REPORT_INTERVAL_MINUTES"], bot_section.get("report_interval_minutes", 60)), 60),
             log_level=str(_select(source_env, ["LOG_LEVEL"], bot_section.get("log_level", "INFO"))).upper(),
         )
+
+        # Legacy override: allow BASE_RESET_HOURS to convert into minutes if provided
+        legacy_hours = _select(source_env, ["BASE_RESET_HOURS", "BOT_BASE_RESET_HOURS"], bot_section.get("base_reset_hours"))
+        if legacy_hours not in (None, ""):
+            try:
+                hours_val = float(legacy_hours)
+            except (TypeError, ValueError):
+                hours_val = None
+            if hours_val is not None and hours_val >= 0:
+                bot.base_reset_minutes = max(0, int(hours_val * 60))
 
         def build_band(prefix: str, section: Mapping[str, Any], defaults: Dict[str, Any]) -> StrategyBand:
             env_prefix = prefix.upper()
@@ -508,6 +530,7 @@ class BotConfig:
             ("BOT_DRY_RUN", str(self.bot.dry_run).lower()),
             ("BOT_HF_MODE", str(self.bot.hf_mode).lower()),
             ("BOT_USE_MARKET_ORDERS", str(self.bot.use_market_orders).lower()),
+            ("BASE_RESET_MINUTES", str(self.bot.base_reset_minutes)),
             ("TIMEZONE", self.bot.timezone),
             ("REPORT_INTERVAL_MINUTES", str(self.bot.report_interval_minutes)),
             ("LOG_LEVEL", self.bot.log_level),

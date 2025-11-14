@@ -80,11 +80,14 @@ class GridStrategy:
         self._last_clock_warning = 0.0
         self.buy_pause_until = 0.0
         self.buy_failure_streak = 0
+        self.base_reset_seconds = max(0.0, float(self.config.bot.base_reset_minutes) * 60.0)
+        self._base_price_last_update = time.time()
 
         # 초기 기준가 및 변동성 설정
         quote = self.exchange.fetch_quote()
         self.price = quote.price
         self.base_price = self.price  # ★ 최초 기준 가격은 봇 시작 시점의 가격
+        self._base_price_last_update = time.time()
         self.volatility = self.vol_estimator.update(self.price)
         self.tp_ratio, self.sl_ratio = self._compute_targets(self.volatility)
 
@@ -119,6 +122,8 @@ class GridStrategy:
         self.volatility = self.vol_estimator.update(self.price)
         self.tp_ratio, self.sl_ratio = self._compute_targets(self.volatility)
 
+        now = time.time()
+
         if quote.server_time:
             drift = abs(time.time() - quote.server_time)
             if drift > 3 and time.time() - self._last_clock_warning > 60:
@@ -138,16 +143,21 @@ class GridStrategy:
             ) / max(total_qty, 1e-12)
 
             if self.base_price <= 0:
-                # 혹시라도 초기값이 0이거나 깨졌다면 한 번만 재설정
-                self.base_price = avg_price
+                new_base = avg_price
             else:
                 # 기존 기준가와 평단 중 더 낮은 쪽을 기준으로 유지
-                self.base_price = min(self.base_price, avg_price)
+                new_base = min(self.base_price, avg_price)
+
+            if new_base > 0 and not math.isclose(new_base, self.base_price, rel_tol=1e-9, abs_tol=1e-9):
+                self.base_price = new_base
+                self._base_price_last_update = now
 
         # 포지션이 하나도 없을 때는 base_price를 건드리지 않는다.
         # - 최초 실행 시: __init__에서 잡은 시작 가격을 유지
         # - 모든 포지션 청산 후: 마지막 사이클의 기준 가격을 유지
         # 이렇게 해야 base_price 아래로 내려갔을 때 그리드 매수가 동작한다.
+        if not self.state.positions:
+            self._maybe_reset_stale_base(now)
 
     def _compute_targets(self, volatility: float) -> tuple[float, float]:
         tp = max(self.band.tp_floor, volatility * self.band.tp_multiplier)
@@ -214,6 +224,7 @@ class GridStrategy:
             self.state.positions.append(Position(price=price, quantity=quantity))
             self.pending_orders[order_id] = {"time": time.time(), "side": "buy"}
             self._mark_order()
+            self._base_price_last_update = time.time()
             total_units = sum(p.quantity for p in self.state.positions)
             avg_price = sum(
                 p.price * p.quantity for p in self.state.positions
@@ -296,6 +307,7 @@ class GridStrategy:
                 self.state.positions.remove(position)
                 self.pending_orders[order_id] = {"time": time.time(), "side": "sell"}
                 self._mark_order()
+                self._base_price_last_update = time.time()
 
                 remaining_units = sum(p.quantity for p in self.state.positions)
                 avg_price = (
@@ -413,6 +425,44 @@ class GridStrategy:
     # ------------------------------------------------------------------
     def _ensure_order_id(self, result: OrderResult) -> str:
         return result.order_id or f"gen-{uuid.uuid4().hex[:12]}"
+
+    def _maybe_reset_stale_base(self, now: float) -> None:
+        if self.base_reset_seconds <= 0:
+            return
+        if self.state.positions:
+            return
+        if self.price <= 0:
+            return
+        idle_seconds = now - self._base_price_last_update
+        if idle_seconds < self.base_reset_seconds:
+            return
+
+        old_base = self.base_price
+        self.base_price = self.price
+        self._base_price_last_update = now
+
+        note = {
+            "reason": "stale_base_reset",
+            "idle_minutes": round(idle_seconds / 60.0, 2),
+            "new_base": self.base_price,
+        }
+        if old_base > 0:
+            note["old_base"] = old_base
+
+        self.logger.log_trade(
+            event="BASE_RESET",
+            side="HOLD",
+            price=self.price,
+            quantity=0.0,
+            notional=0.0,
+            profit=0.0,
+            avg_price=0.0,
+            position_units=0.0,
+            tp_ratio=self.tp_ratio,
+            sl_ratio=self.sl_ratio,
+            note=note,
+            order_id="",
+        )
 
 
 __all__ = ["GridStrategy", "EWMA"]
