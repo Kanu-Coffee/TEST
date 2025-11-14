@@ -45,6 +45,8 @@ class BithumbExchange(Exchange):
         self._session.headers.update({"User-Agent": "grid-bot/1.0"})
         self._last_clock_warning = 0.0
         self._last_nonce = 0
+        self._time_offset_ms = 0  # 서버 시간과의 차이를 ms 단위로 저장
+        self._last_time_sync = 0.0  # 마지막 시간 동기화 시간
 
     # ------------------------------------------------------------------
     # Helpers
@@ -56,8 +58,56 @@ class BithumbExchange(Exchange):
         base = self.config.bithumb.rest_base_url or self.config.bithumb.base_url
         return base.rstrip("/")
 
+    def _sync_server_time(self) -> None:
+        """
+        Bithumb 공개 API(/public/ticker)에서 서버 시간을 가져와 로컬 시간과 비교.
+        시간 오차를 자동으로 계산하고 저장함 (Home Assistant 시간 드리프트 대응).
+        """
+        try:
+            # 공개 API는 인증 불필요, 시간 드리프트 감지 목적
+            url = f"{self._base_url()}/public/ticker/BTC_KRW"
+            resp = self._session.get(url, timeout=3)
+            resp.raise_for_status()
+            
+            data = resp.json()
+            if isinstance(data, dict):
+                server_time_ms = int(data.get("data", {}).get("date", 0))
+                if server_time_ms > 0:
+                    local_time_ms = int(time.time() * 1000)
+                    new_offset_ms = server_time_ms - local_time_ms
+                    
+                    # 기존 오프셋과 비교 (급격한 변화는 무시)
+                    if abs(new_offset_ms - self._time_offset_ms) > 10000:  # 10초 이상 변화 무시
+                        return
+                    
+                    self._time_offset_ms = new_offset_ms
+                    self._last_time_sync = time.time()
+                    
+                    if abs(new_offset_ms) > 2000:  # 2초 이상 차이일 때만 경고
+                        drift_sec = new_offset_ms / 1000.0
+                        import sys
+                        print(
+                            f"⏰ 시스템 시간 오차: {drift_sec:+.2f}초 "
+                            f"(Bithumb 서버 시간과 비교)\n"
+                            f"   → 자동으로 보정됩니다 (요청 시 {abs(drift_sec):.2f}초 {"뒤로" if drift_sec > 0 else "앞으로"} 조정)"
+                        )
+        except Exception as e:
+            # 시간 동기화 실패는 조용히 처리 (1차 요청이 실패해도 계속 진행)
+            pass
+
     def _next_nonce(self) -> str:
-        now = int(time.time() * 1000)
+        """
+        ⚠️ 서버 시간 오차 자동 보정
+        - 첫 요청 시간 동기화 시도
+        - 이후 요청마다 time_offset을 적용
+        - Home Assistant의 느린 NTP 동기화 대응
+        """
+        # 처음 또는 1분마다 서버 시간 동기화 시도
+        now_sec = time.time()
+        if self._last_time_sync == 0 or (now_sec - self._last_time_sync > 60):
+            self._sync_server_time()
+        
+        now = int(time.time() * 1000) + self._time_offset_ms
         if now <= self._last_nonce:
             now = self._last_nonce + 1
         self._last_nonce = now

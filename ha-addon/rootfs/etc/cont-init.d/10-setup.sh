@@ -78,6 +78,18 @@ ERROR_LOG_PORT=${ERROR_LOG_PORT:-6441}
 # ensure PATH covers all base locations (s6 init path bug workaround)
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PATH:-}"
 
+# ⏰ NTP 시간 동기화 (Home Assistant 시간 드리프트 대응)
+# 컨테이너 시작 시 강제 동기화
+bashio::log.info "Syncing system time with NTP servers"
+if command -v chronyc &>/dev/null; then
+    chronyc makestep || true  # Chrony가 설치된 경우
+elif command -v ntpdate &>/dev/null; then
+    ntpdate -s pool.ntp.org || true  # ntpdate 사용
+else
+    # busybox/Alpine 기본 유틸 사용
+    ntpd -q -n -p pool.ntp.org 2>/dev/null || true
+fi
+
 bashio::log.info "Preparing trading bot workspace"
 
 # --------------------------------------------------------------------
