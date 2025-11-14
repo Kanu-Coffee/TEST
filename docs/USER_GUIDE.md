@@ -114,12 +114,29 @@ bithumb:
   api_key: ""
   api_secret: ""
   base_url: https://api.bithumb.com
+  rest_base_url: https://api.bithumb.com
+  rest_place_endpoint: /api/v2/spot/trade/place
+  rest_market_buy_endpoint: /api/v2/spot/trade/market_buy
+  rest_market_sell_endpoint: /api/v2/spot/trade/market_sell
+  prefer_rest: false
+  enable_failover: true
+  rest_symbol_dash: true
+  rest_symbol_upper: true
   auth_mode: legacy    # 또는 jwt (추가 구현 시)
 ```
 
-- `api_key`, `api_secret`  
+- `api_key`, `api_secret`
   - 빗썸 API 키
   - 환경변수: `BITHUMB_API_KEY`, `BITHUMB_API_SECRET`
+- `prefer_rest`
+  - `true` 로 설정하면 v2.1.0 REST → 레거시(v1.2.0) 순으로 주문 전송
+  - `false` 이면 레거시 → REST 순
+- `enable_failover`
+  - `true` 일 때 첫 번째 경로가 4xx/5xx 로 실패하면 다른 버전으로 자동 재시도
+- `rest_*_endpoint`
+  - 빗썸 API 문서(https://apidocs.bithumb.com/) 기준 엔드포인트를 원하는 버전으로 교체 가능
+- `rest_symbol_dash`, `rest_symbol_upper`
+  - v2.1 심볼 포맷이 `BTC-KRW` 처럼 하이픈/대문자를 요구할 때 조정
 
 #### 4.2.2 KIS (한국투자증권)
 
@@ -177,6 +194,10 @@ strategy:
     cancel_min_wait: 5.0
     cancel_max_wait: 30.0
     cancel_volume_scale: 2000.0
+    failure_pause_seconds: 10.0
+    failure_pause_backoff: 2.0
+    failure_pause_max: 180.0
+    post_fill_pause_seconds: 3.0
 
   high_frequency:
     buy_step: 0.005
@@ -216,8 +237,20 @@ tp = max(tp_floor,  vol * tp_multiplier)
 sl = max(sl_floor,  vol * sl_multiplier)
 ```
 
-- `tp_floor`, `sl_floor`: 최소 익절/손절 한계  
-- `tp_multiplier`, `sl_multiplier`: 변동성에 곱해지는 계수  
+- `tp_floor`, `sl_floor`: 최소 익절/손절 한계
+- `tp_multiplier`, `sl_multiplier`: 변동성에 곱해지는 계수
+
+### 5.3 주문 실패 백오프 & 휴지기
+
+- **failure_pause_seconds**
+  - 첫 번째 매수 실패 후 잠시 멈추는 시간(초)
+- **failure_pause_backoff**
+  - 같은 이유로 연속 실패하면 대기 시간을 곱해감 (예: 10s → 20s → 40s)
+- **failure_pause_max**
+  - 백오프로 늘어나더라도 이 값을 넘지 않도록 제한
+- **post_fill_pause_seconds**
+  - 주문이 체결된 직후 잠깐 쉬어 가격이 튀는 구간에서 과도한 재진입을 방지
+- 위 값들은 HF/기본 밴드별로 각각 설정 가능 (`strategy.default.*`, `strategy.high_frequency.*`)
 
 예:  
 - `vol ≈ 0.0045 (0.45%)`, `tp_multiplier=0.8`, `tp_floor=0.0015`  
