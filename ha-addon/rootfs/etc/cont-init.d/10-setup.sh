@@ -17,7 +17,6 @@ ORDER_CCY="$(bashio::config 'bot_order_currency')"
 PAY_CCY="$(bashio::config 'bot_payment_currency')"
 DRY_RUN="$(bashio::config 'bot_dry_run')"
 HF_MODE="$(bashio::config 'bot_hf_mode')"
-BASE_RESET_MINUTES="$(bashio::config 'base_reset_minutes')"
 DEFAULT_BASE="$(bashio::config 'default_base_order_value')"
 DEFAULT_STEP="$(bashio::config 'default_buy_step')"
 DEFAULT_MARTINGALE="$(bashio::config 'default_martingale_mul')"
@@ -57,7 +56,6 @@ ORDER_CCY=${ORDER_CCY:-USDT}
 PAY_CCY=${PAY_CCY:-KRW}
 DRY_RUN=${DRY_RUN:-true}
 HF_MODE=${HF_MODE:-true}
-BASE_RESET_MINUTES=${BASE_RESET_MINUTES:-15}
 DEFAULT_BASE=${DEFAULT_BASE:-5000}
 DEFAULT_STEP=${DEFAULT_STEP:-0.008}
 DEFAULT_MARTINGALE=${DEFAULT_MARTINGALE:-1.5}
@@ -74,9 +72,6 @@ KIS_ORDER_LOT_SIZE=${KIS_ORDER_LOT_SIZE:-1.0}
 GATEWAY_PORT=${GATEWAY_PORT:-6443}
 TRADE_LOG_PORT=${TRADE_LOG_PORT:-6442}
 ERROR_LOG_PORT=${ERROR_LOG_PORT:-6441}
-
-# ensure PATH covers all base locations (s6 init path bug workaround)
-export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PATH:-}"
 
 bashio::log.info "Preparing trading bot workspace"
 
@@ -136,6 +131,8 @@ if [ -f /opt/bot/requirements.txt ]; then
 
     # pip 업그레이드는 최초 1회만 수행하여 부팅시간 단축
     PIP_UPGRADE_FLAG="/data/bot/.pip_upgraded"
+    mkdir -p "$(dirname "${PIP_UPGRADE_FLAG}")"
+
     if [ ! -f "${PIP_UPGRADE_FLAG}" ]; then
         if ! "${PIP_CMD[@]}" install --upgrade pip --break-system-packages; then
             bashio::log.warning "pip upgrade failed, continuing with existing version"
@@ -192,7 +189,6 @@ ENV_FILE="/data/bot/.env"
     printf 'BOT_PAYMENT_CURRENCY=%s\n' "${PAY_CCY}"
     printf 'BOT_DRY_RUN=%s\n' "${DRY_RUN}"
     printf 'BOT_HF_MODE=%s\n' "${HF_MODE}"
-    printf 'BASE_RESET_MINUTES=%s\n' "${BASE_RESET_MINUTES}"
     printf 'DEFAULT_BASE_ORDER_VALUE=%s\n' "${DEFAULT_BASE}"
     printf 'DEFAULT_BASE_KRW=%s\n' "${DEFAULT_BASE}"
     printf 'DEFAULT_BUY_STEP=%s\n' "${DEFAULT_STEP}"
