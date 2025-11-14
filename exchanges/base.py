@@ -11,6 +11,8 @@ from bot.config import BotConfig
 class Quote:
     price: float
     volume_24h: float
+    timestamp: float = 0.0
+    server_time: float = 0.0
 
 
 @dataclass

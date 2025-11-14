@@ -176,6 +176,7 @@ class BotSettings:
     payment_currency: str = "KRW"
     dry_run: bool = True
     hf_mode: bool = True
+    use_market_orders: bool = False
     timezone: str = "Asia/Seoul"
     report_interval_minutes: int = 60
     log_level: str = "INFO"
@@ -251,6 +252,7 @@ class BotConfig:
             payment_currency=str(_select(source_env, ["BOT_PAYMENT_CURRENCY", "PAYMENT_CURRENCY"], bot_section.get("payment_currency", "KRW"))),
             dry_run=_as_bool(_select(source_env, ["BOT_DRY_RUN", "DRY_RUN"], bot_section.get("dry_run", True)), True),
             hf_mode=_as_bool(_select(source_env, ["BOT_HF_MODE", "HF_MODE"], bot_section.get("hf_mode", True)), True),
+            use_market_orders=_as_bool(_select(source_env, ["BOT_USE_MARKET_ORDERS", "USE_MARKET_ORDERS"], bot_section.get("use_market_orders", False)), False),
             timezone=str(_select(source_env, ["TIMEZONE"], bot_section.get("timezone", "Asia/Seoul"))),
             report_interval_minutes=_as_int(_select(source_env, ["REPORT_INTERVAL_MINUTES"], bot_section.get("report_interval_minutes", 60)), 60),
             log_level=str(_select(source_env, ["LOG_LEVEL"], bot_section.get("log_level", "INFO"))).upper(),
@@ -432,6 +434,7 @@ class BotConfig:
             ("BOT_PAYMENT_CURRENCY", self.bot.payment_currency),
             ("BOT_DRY_RUN", str(self.bot.dry_run).lower()),
             ("BOT_HF_MODE", str(self.bot.hf_mode).lower()),
+            ("BOT_USE_MARKET_ORDERS", str(self.bot.use_market_orders).lower()),
             ("TIMEZONE", self.bot.timezone),
             ("REPORT_INTERVAL_MINUTES", str(self.bot.report_interval_minutes)),
             ("LOG_LEVEL", self.bot.log_level),

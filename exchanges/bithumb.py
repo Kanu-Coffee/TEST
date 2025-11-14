@@ -7,7 +7,7 @@ import hmac
 import json
 import time
 import uuid
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Dict, Iterable, List
 from urllib.parse import urlencode
 
 import requests
@@ -15,6 +15,16 @@ import requests
 from bot.config import BotConfig
 
 from .base import Exchange, OpenOrder, OrderResult, Quote
+
+
+ERROR_HINTS: Dict[str, str] = {
+    "5100": "요청 파라미터를 확인하세요.",
+    "5200": "시그니처 오류입니다. API 키와 시크릿, 시스템 시간을 점검하세요.",
+    "5300": "Nonce 값이 너무 낮습니다. 서버 시간과 시스템 시간 차이를 확인하세요.",
+    "5400": "허용되지 않은 IP입니다. API 키에 등록된 IP를 확인하세요.",
+    "5500": "해당 API 키에 필요한 권한이 없습니다.",
+    "5600": "API 키가 비활성화되었습니다.",
+}
 
 
 def _now_ms() -> str:
@@ -53,6 +63,8 @@ class BithumbExchange(Exchange):
     def __init__(self, config: BotConfig) -> None:
         super().__init__(config)
         self._session = requests.Session()
+        self._session.headers.update({"User-Agent": "grid-bot/1.0"})
+        self._last_clock_warning = 0.0
 
         # None / 미설정 / 기타 값 -> 기본 legacy 로 취급
         mode = getattr(self.config.bithumb, "auth_mode", "legacy") or "legacy"
@@ -65,24 +77,56 @@ class BithumbExchange(Exchange):
     def _base_url(self) -> str:
         return self.config.bithumb.base_url.rstrip("/")
 
-    # ---------- v1.2.0 HMAC 서명 --------------------------------------
-    def _signed_headers_legacy(self, endpoint: str, params: Dict[str, str]) -> Dict[str, str]:
-        """
-        v1.2.0 Private API용 HMAC 서명 헤더.
-        docs: /public/ticker/{order_currency}_{payment_currency}, /trade/place 등.
-        """
+    def _signed_headers(self, endpoint: str, body: str) -> Dict[str, str]:
         cred = self.config.bithumb
-        query = "&".join(f"{key}={value}" for key, value in params.items()) if params else ""
-        nonce = _now_ms()
-        payload = f"{endpoint}\x00{query}\x00{nonce}".encode("utf-8")
+        headers: Dict[str, str] = {"Api-Client-Type": "2"}
+        if cred.auth_mode.lower() == "jwt":
+            headers.update(
+                {
+                    "Authorization": f"Bearer {cred.api_key}",
+                    "Content-Type": "application/json",
+                }
+            )
+            return headers
 
-        signature = hmac.new(cred.api_secret.encode("utf-8"), payload, hashlib.sha512).hexdigest()
-        return {
-            "Api-Key": cred.api_key,
-            "Api-Nonce": nonce,
-            "Api-Sign": signature,
-            "Content-Type": "application/x-www-form-urlencoded",
-        }
+        nonce = _now_ms()
+        payload = f"{endpoint}\x00{body}\x00{nonce}".encode("utf-8")
+        digest = hmac.new(cred.api_secret.encode("utf-8"), payload, hashlib.sha512).digest()
+        signature = base64.b64encode(digest).decode("utf-8")
+        headers.update(
+            {
+                "Api-Key": cred.api_key,
+                "Api-Nonce": nonce,
+                "Api-Sign": signature,
+                "Content-Type": "application/x-www-form-urlencoded",
+            }
+        )
+        return headers
+
+    def _private_post(self, endpoint: str, params: Dict[str, str]) -> Dict[str, object]:
+        url = f"{self._base_url()}{endpoint}"
+        auth_mode = self.config.bithumb.auth_mode.lower()
+        try:
+            if auth_mode == "jwt":
+                headers = self._signed_headers(endpoint, "")
+                response = self._session.post(url, headers=headers, json=params, timeout=7)
+            else:
+                encoded = urlencode(params or {}, doseq=True)
+                headers = self._signed_headers(endpoint, encoded)
+                response = self._session.post(url, headers=headers, data=encoded, timeout=7)
+            response.raise_for_status()
+            return response.json()
+        except requests.RequestException as exc:
+            return {"status": "HTTP_ERROR", "message": str(exc)}
+        except ValueError as exc:
+            return {"status": "JSON_ERROR", "message": str(exc)}
+
+    def _apply_hint(self, payload: Dict[str, object]) -> Dict[str, object]:
+        status = str(payload.get("status", ""))
+        if status in ERROR_HINTS and "hint" not in payload:
+            payload = dict(payload)
+            payload["hint"] = ERROR_HINTS[status]
+        return payload
 
     # ---------- v2.1.x JWT 서명 ---------------------------------------
     def _jwt_headers(self, params: Optional[Dict[str, Any]] = None) -> Dict[str, str]:
@@ -126,194 +170,98 @@ class BithumbExchange(Exchange):
     # Exchange interface
     # ------------------------------------------------------------------
     def fetch_quote(self) -> Quote:
-        """
-        - legacy(HMAC): GET /public/ticker/{order_currency}_{payment_currency} (v1.2.0)
-        - jwt        : GET /v1/ticker?markets=KRW-BTC 형식 (응답은 배열)
-        """
-        if self._use_legacy:
-            url = f"{self._base_url()}/public/ticker/{self.config.bot.symbol_ticker}"
-            resp = self._session.get(url, timeout=5)
-            data = resp.json().get("data", {}) or {}
-            price = float(data.get("closing_price", 0) or 0)
-            volume = float(data.get("units_traded_24H", 0) or 0)
-            return Quote(price=price, volume_24h=volume)
-
-        # v2.1.x ticker (PUBLIC, JWT 불필요)
-        url = f"{self._base_url()}/v1/ticker"
-        params = {"markets": self._market_id()}
-        resp = self._session.get(url, params=params, timeout=5)
+        url = f"{self._base_url()}/public/ticker/{self.config.bot.symbol_ticker}"
+        resp = self._session.get(url, timeout=5)
+        resp.raise_for_status()
         payload = resp.json()
-
-        # 응답은 [{"market": "...", "trade_price": ..., "acc_trade_volume_24h": ...}, ...] 형태
-        item: Dict[str, Any] = {}
-        if isinstance(payload, list) and payload:
-            item = payload[0]
-        elif isinstance(payload, dict):
-            # 혹시 dict 형태로 오는 경우 대비
-            item = payload
-
-        price = float(item.get("trade_price", 0) or 0)
-        volume = float(item.get("acc_trade_volume_24h", 0) or 0)
-        return Quote(price=price, volume_24h=volume)
+        data = payload.get("data", {}) if isinstance(payload, dict) else {}
+        price = float(data.get("closing_price", 0) or 0)
+        volume = float(data.get("units_traded_24H", 0) or 0)
+        server_time = 0.0
+        try:
+            server_time = float(data.get("date", 0) or 0) / 1000.0
+        except (TypeError, ValueError):
+            server_time = 0.0
+        now = time.time()
+        if server_time:
+            drift = abs(now - server_time)
+            if drift > 3 and now - self._last_clock_warning > 60:
+                print(
+                    f"[Bithumb] 시스템 시간과 거래소 시간 차이 {drift:.2f}s 발견. "
+                    "서버 시간을 동기화하고 IP 화이트리스트, JWT 설정을 확인하세요."
+                )
+                self._last_clock_warning = now
+        return Quote(price=price, volume_24h=volume, timestamp=now, server_time=server_time)
 
     def place_order(self, side: str, price: float, quantity: float) -> OrderResult:
-        """
-        - legacy(HMAC): POST /trade/place (기존 구현 유지, status == '0000' 체크)
-        - jwt        : POST /v1/orders (market, side, volume, price, ord_type)
-        """
+        is_buy = side.lower() == "buy"
         if self.config.bot.dry_run:
-            params = {
-                "side": side,
-                "price": self.round_price(price),
-                "quantity": self.round_quantity(quantity),
-            }
-            return OrderResult(True, f"dry-{uuid.uuid4().hex[:12]}", params)
+            return OrderResult(
+                True,
+                f"dry-{uuid.uuid4().hex[:12]}",
+                {
+                    "side": side,
+                    "price": price,
+                    "quantity": quantity,
+                    "mode": "market" if self.config.bot.use_market_orders else "limit",
+                },
+            )
 
-        if self._use_legacy:
+        if self.config.bot.use_market_orders:
+            endpoint = "/trade/market_buy" if is_buy else "/trade/market_sell"
+            params = {
+                "order_currency": self.config.bot.order_currency,
+                "payment_currency": self.config.bot.payment_currency,
+                "units": f"{quantity:.8f}",
+            }
+        else:
             endpoint = "/trade/place"
             params = {
                 "order_currency": self.config.bot.order_currency,
                 "payment_currency": self.config.bot.payment_currency,
-                "units": f"{self.round_quantity(quantity):.8f}",
-                "price": str(int(round(self.round_price(price)))),
-                "type": "bid" if side.lower() == "buy" else "ask",
+                "units": f"{quantity:.8f}",
+                "price": str(int(round(price))),
+                "type": "bid" if is_buy else "ask",
             }
-            headers = self._signed_headers_legacy(endpoint, params)
-            resp = self._session.post(
-                self._base_url() + endpoint,
-                headers=headers,
-                data=params,
-                timeout=7,
-            )
-            payload = resp.json()
-            success = payload.get("status") == "0000"
-            order_id = str(payload.get("order_id", "") or "")
-            return OrderResult(success, order_id, payload)
 
-        # v2.1.x JWT 주문
-        endpoint = "/v1/orders"
-        body = {
-            "market": self._market_id(),
-            "side": "bid" if side.lower() == "buy" else "ask",
-            "volume": f"{self.round_quantity(quantity):.8f}",
-            "price": str(int(round(self.round_price(price)))),
-            "ord_type": "limit",  # 봇은 지정가 주문만 사용
-        }
-        headers = self._jwt_headers(body)
-        resp = self._session.post(
-            self._base_url() + endpoint,
-            headers=headers,
-            json=body,
-            timeout=7,
-        )
-        payload = resp.json()
-        success = resp.ok and bool(payload.get("uuid"))
-        order_id = str(payload.get("uuid", "") or "")
+        payload = self._private_post(endpoint, params)
+        payload = self._apply_hint(payload)
+        status = str(payload.get("status")) if isinstance(payload, dict) else ""
+        success = status == "0000"
+        order_id = str(payload.get("order_id", "")) if isinstance(payload, dict) else ""
         return OrderResult(success, order_id, payload)
 
     def cancel_order(self, order_id: str, side: str) -> bool:
-        """
-        - legacy(HMAC): POST /trade/cancel (order_id + type)
-        - jwt        : DELETE /v1/order (uuid)
-        """
         if self.config.bot.dry_run:
             return True
 
-        if self._use_legacy:
-            endpoint = "/trade/cancel"
-            params = {
-                "order_currency": self.config.bot.order_currency,
-                "payment_currency": self.config.bot.payment_currency,
-                "order_id": order_id,
-                "type": "bid" if side.lower() == "buy" else "ask",
-            }
-            headers = self._signed_headers_legacy(endpoint, params)
-            resp = self._session.post(
-                self._base_url() + endpoint,
-                headers=headers,
-                data=params,
-                timeout=7,
-            )
-            payload = resp.json()
-            return payload.get("status") == "0000"
+        endpoint = "/trade/cancel"
+        params = {
+            "order_currency": self.config.bot.order_currency,
+            "payment_currency": self.config.bot.payment_currency,
+            "order_id": order_id,
+            "type": "bid" if side.lower() == "buy" else "ask",
+        }
 
-        # v2.1.x JWT: DELETE /v1/order, body: {"uuid": "..."}
-        endpoint = "/v1/order"
-        body = {"uuid": order_id}
-        headers = self._jwt_headers(body)
-        resp = self._session.delete(
-            self._base_url() + endpoint,
-            headers=headers,
-            json=body,
-            timeout=7,
-        )
-        # 정상 응답이면 uuid, state 등이 딸려옴. status 필드는 없다.
-        if not resp.ok:
-            return False
-        payload = resp.json()
-        return bool(payload.get("uuid"))
+        payload = self._private_post(endpoint, params)
+        payload = self._apply_hint(payload)
+        status = str(payload.get("status")) if isinstance(payload, dict) else ""
+        return status == "0000"
 
     def list_open_orders(self) -> Iterable[OpenOrder]:
-        """
-        - legacy(HMAC): POST /info/orders, status == '0000' 이고 data 배열에서 order_id / type 사용.
-        - jwt        : GET  /v1/orders?market=...&state=wait (체결 대기 주문 조회).
-        """
         if self.config.bot.dry_run:
             return []
 
-        if self._use_legacy:
-            endpoint = "/info/orders"
-            params = {
-                "order_currency": self.config.bot.order_currency,
-                "payment_currency": self.config.bot.payment_currency,
-            }
-            headers = self._signed_headers_legacy(endpoint, params)
-            resp = self._session.post(
-                self._base_url() + endpoint,
-                headers=headers,
-                data=params,
-                timeout=7,
-            )
-            payload = resp.json()
-            if payload.get("status") != "0000":
-                return []
-
-            rows: List[OpenOrder] = []
-            for row in payload.get("data") or []:
-                rows.append(
-                    OpenOrder(
-                        order_id=str(row.get("order_id")),
-                        side="buy"
-                        if str(row.get("type", "bid")).lower() == "bid"
-                        else "sell",
-                    )
-                )
-            return rows
-
-        # v2.1.x JWT: GET /v1/orders
-        endpoint = "/v1/orders"
+        endpoint = "/info/orders"
         params = {
-            "market": self._market_id(),
-            "state": "wait",  # 체결 대기 주문
-            "page": 1,
-            "limit": 100,
-            "order_by": "desc",
+            "order_currency": self.config.bot.order_currency,
+            "payment_currency": self.config.bot.payment_currency,
         }
-        headers = self._jwt_headers(params)
-        resp = self._session.get(
-            self._base_url() + endpoint,
-            headers=headers,
-            params=params,
-            timeout=7,
-        )
-        payload = resp.json()
-        data: List[Dict[str, Any]]
-        if isinstance(payload, list):
-            data = payload
-        else:
-            # 혹시 dict에 'data' key로 감싸져올 수도 있으니 방어 코드
-            data = payload.get("data") or []
 
+        payload = self._private_post(endpoint, params)
+        payload = self._apply_hint(payload)
+        if not isinstance(payload, dict) or str(payload.get("status")) != "0000":
+            return []
         rows: List[OpenOrder] = []
         for row in data:
             rows.append(
