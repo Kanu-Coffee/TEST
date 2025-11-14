@@ -87,7 +87,7 @@ bot:
   timezone: Asia/Seoul
   report_interval_minutes: 60
   log_level: INFO
-  base_reset_minutes: 1440  # 선택: N분 동안 매수 없으면 기준가(base) 리셋
+  base_reset_minutes: 15    # 선택: N분 동안 기준가가 그대로면 현재가로 리셋
 ```
 
 - **exchange**
@@ -100,10 +100,10 @@ bot:
   - `true`  : 고빈도(HF) 밴드 파라미터 사용
   - `false` : 기본(default) 밴드 사용
 - **base_reset_minutes**
-  - 최근 **매수 체결이 없는 시간이 N분을 넘으면** 기준가(`base`) 를 현재 가격으로 재설정  
-  - 장이 한 방향으로만 오래 가서 그리드가 전혀 체결되지 않는 상황 방지
-  - 기본값 1440분 = 24시간  
-  - 환경변수: `BASE_RESET_MINUTES` 또는 `BOT_BASE_RESET_MINUTES`
+  - 최근 **기준가가 N분 동안 그대로면** 현재 가격으로 기준가(`base`)를 재설정합니다.
+  - 장이 한 방향으로만 오래 가서 그리드가 전혀 체결되지 않는 상황을 방지합니다.
+  - 기본값 15분이며 환경변수 `BASE_RESET_MINUTES` 또는 `BOT_BASE_RESET_MINUTES`로 조정할 수 있습니다.
+  - 기존 버전과 호환을 위해 `BASE_RESET_HOURS` (시 단위)도 인식합니다.
 
 ### 4.2 거래소별 인증 설정
 
@@ -114,12 +114,32 @@ bithumb:
   api_key: ""
   api_secret: ""
   base_url: https://api.bithumb.com
+  rest_base_url: https://global-openapi.bithumb.com
+  rest_place_endpoint: /api/v2/spot/trade/place
+  rest_market_buy_endpoint: /api/v2/spot/trade/market_buy
+  rest_market_sell_endpoint: /api/v2/spot/trade/market_sell
+  prefer_rest: false
+  enable_failover: true
+  rest_symbol_dash: true
+  rest_symbol_upper: true
   auth_mode: legacy    # 또는 jwt (추가 구현 시)
 ```
 
-- `api_key`, `api_secret`  
+- `api_key`, `api_secret`
   - 빗썸 API 키
   - 환경변수: `BITHUMB_API_KEY`, `BITHUMB_API_SECRET`
+- `prefer_rest`
+  - `true` 로 설정하면 v2.1.0 REST → 레거시(v1.2.0) 순으로 주문 전송
+  - `false` 이면 레거시 → REST 순
+- `enable_failover`
+  - `true` 일 때 첫 번째 경로가 4xx/5xx 로 실패하면 다른 버전으로 자동 재시도
+- `rest_*_endpoint`
+  - 빗썸 API 문서(https://apidocs.bithumb.com/) 기준 엔드포인트를 원하는 버전으로 교체 가능
+- `rest_symbol_dash`, `rest_symbol_upper`
+  - v2.1 심볼 포맷이 `BTC-KRW` 처럼 하이픈/대문자를 요구할 때 조정
+- 주문 시그니처는 공식 문서처럼 **HMAC-SHA512 → Base64**(바이너리 다이제스트) 순으로 계산합니다.
+  봇이 millisecond nonce 를 자동 생성하지만, 동일 ms 내 다중 주문을 위해
+  시스템 시간이 역행하지 않도록 NTP 동기화를 유지해 주세요.
 
 #### 4.2.2 KIS (한국투자증권)
 
@@ -177,6 +197,10 @@ strategy:
     cancel_min_wait: 5.0
     cancel_max_wait: 30.0
     cancel_volume_scale: 2000.0
+    failure_pause_seconds: 10.0
+    failure_pause_backoff: 2.0
+    failure_pause_max: 180.0
+    post_fill_pause_seconds: 3.0
 
   high_frequency:
     buy_step: 0.005
@@ -216,8 +240,20 @@ tp = max(tp_floor,  vol * tp_multiplier)
 sl = max(sl_floor,  vol * sl_multiplier)
 ```
 
-- `tp_floor`, `sl_floor`: 최소 익절/손절 한계  
-- `tp_multiplier`, `sl_multiplier`: 변동성에 곱해지는 계수  
+- `tp_floor`, `sl_floor`: 최소 익절/손절 한계
+- `tp_multiplier`, `sl_multiplier`: 변동성에 곱해지는 계수
+
+### 5.3 주문 실패 백오프 & 휴지기
+
+- **failure_pause_seconds**
+  - 첫 번째 매수 실패 후 잠시 멈추는 시간(초)
+- **failure_pause_backoff**
+  - 같은 이유로 연속 실패하면 대기 시간을 곱해감 (예: 10s → 20s → 40s)
+- **failure_pause_max**
+  - 백오프로 늘어나더라도 이 값을 넘지 않도록 제한
+- **post_fill_pause_seconds**
+  - 주문이 체결된 직후 잠깐 쉬어 가격이 튀는 구간에서 과도한 재진입을 방지
+- 위 값들은 HF/기본 밴드별로 각각 설정 가능 (`strategy.default.*`, `strategy.high_frequency.*`)
 
 예:  
 - `vol ≈ 0.0045 (0.45%)`, `tp_multiplier=0.8`, `tp_floor=0.0015`  
@@ -248,8 +284,8 @@ sl = max(sl_floor,  vol * sl_multiplier)
    - `base = min(base, avg_price)`  
      → 평단이 내려갈수록 기준가도 함께 내려가지만, 평단이 올라가면 기준가는 그대로여서  
        그리드가 위로 따라 올라가 **추격 매수**는 하지 않음.
-4. `base_reset_minutes` 만큼 매수 체결이 없다면  
-   - `base` 를 현재 가격으로 다시 설정 → 새로운 구간에서 다시 그리드 구축
+4. `base_reset_minutes` 만큼 기준가가 유지되면
+   - 포지션이 없을 때 현재가로 기준가를 다시 설정 → 새로운 구간에서 다시 그리드 구축
 
 ### 6.2 매수 조건
 
