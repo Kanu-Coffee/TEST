@@ -382,19 +382,60 @@ class BotConfig:
         )
 
         bithumb = BithumbSettings(
-            api_key=str(_select(source_env, ["BITHUMB_API_KEY"], bithumb_section.get("api_key", ""))),
-            api_secret=str(_select(source_env, ["BITHUMB_API_SECRET"], bithumb_section.get("api_secret", ""))),
-            base_url=str(_select(source_env, ["BITHUMB_BASE_URL", "BITHUMB_LEGACY_BASE_URL"], bithumb_section.get("base_url", "https://api.bithumb.com"))),
-            rest_base_url=str(_select(source_env, ["BITHUMB_REST_BASE_URL"], bithumb_section.get("rest_base_url", bithumb_section.get("base_url", "https://api.bithumb.com")))),
-            rest_place_endpoint=str(_select(source_env, ["BITHUMB_REST_PLACE_ENDPOINT"], bithumb_section.get("rest_place_endpoint", "/api/v2/spot/trade/place"))),
-            rest_market_buy_endpoint=str(_select(source_env, ["BITHUMB_REST_MARKET_BUY"], bithumb_section.get("rest_market_buy_endpoint", "/api/v2/spot/trade/market_buy"))),
-            rest_market_sell_endpoint=str(_select(source_env, ["BITHUMB_REST_MARKET_SELL"], bithumb_section.get("rest_market_sell_endpoint", "/api/v2/spot/trade/market_sell"))),
+            api_key=str(_select(source_env, ["BITHUMB_API_KEY"], bithumb_section.get("api_key", ""))).strip(),
+            api_secret=str(_select(source_env, ["BITHUMB_API_SECRET"], bithumb_section.get("api_secret", ""))).strip(),
+            base_url=str(
+                _select(
+                    source_env,
+                    ["BITHUMB_BASE_URL", "BITHUMB_LEGACY_BASE_URL"],
+                    bithumb_section.get("base_url", "https://api.bithumb.com"),
+                )
+            ).strip(),
+            rest_base_url=str(
+                _select(
+                    source_env,
+                    ["BITHUMB_REST_BASE_URL"],
+                    bithumb_section.get("rest_base_url", bithumb_section.get("base_url", "https://api.bithumb.com")),
+                )
+            ).strip(),
+            rest_place_endpoint=str(
+                _select(
+                    source_env,
+                    ["BITHUMB_REST_PLACE_ENDPOINT"],
+                    bithumb_section.get("rest_place_endpoint", "/api/v2/spot/trade/place"),
+                )
+            ).strip(),
+            rest_market_buy_endpoint=str(
+                _select(
+                    source_env,
+                    ["BITHUMB_REST_MARKET_BUY"],
+                    bithumb_section.get("rest_market_buy_endpoint", "/api/v2/spot/trade/market_buy"),
+                )
+            ).strip(),
+            rest_market_sell_endpoint=str(
+                _select(
+                    source_env,
+                    ["BITHUMB_REST_MARKET_SELL"],
+                    bithumb_section.get("rest_market_sell_endpoint", "/api/v2/spot/trade/market_sell"),
+                )
+            ).strip(),
             prefer_rest=_as_bool(_select(source_env, ["BITHUMB_PREFER_REST"], bithumb_section.get("prefer_rest", False)), False),
             enable_failover=_as_bool(_select(source_env, ["BITHUMB_FAILOVER"], bithumb_section.get("enable_failover", True)), True),
             rest_symbol_dash=_as_bool(_select(source_env, ["BITHUMB_REST_SYMBOL_DASH"], bithumb_section.get("rest_symbol_dash", True)), True),
             rest_symbol_upper=_as_bool(_select(source_env, ["BITHUMB_REST_SYMBOL_UPPER"], bithumb_section.get("rest_symbol_upper", True)), True),
             auth_mode=str(_select(source_env, ["BITHUMB_AUTH_MODE"], bithumb_section.get("auth_mode", "legacy"))).lower(),
         )
+
+        if not bithumb.base_url:
+            bithumb.base_url = "https://api.bithumb.com"
+        if not bithumb.rest_base_url:
+            bithumb.rest_base_url = bithumb.base_url
+        if not bithumb.rest_place_endpoint:
+            bithumb.rest_place_endpoint = "/api/v2/spot/trade/place"
+        if not bithumb.rest_market_buy_endpoint:
+            bithumb.rest_market_buy_endpoint = "/api/v2/spot/trade/market_buy"
+        if not bithumb.rest_market_sell_endpoint:
+            bithumb.rest_market_sell_endpoint = "/api/v2/spot/trade/market_sell"
 
         kis = KisSettings(
             app_key=str(_select(source_env, ["KIS_APP_KEY"], kis_section.get("app_key", ""))),

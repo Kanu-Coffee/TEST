@@ -20,10 +20,17 @@ from .base import Exchange, OpenOrder, OrderResult, Quote
 ERROR_HINTS: Dict[str, str] = {
     "5100": "요청 파라미터를 확인하세요.",
     "5200": "시그니처 오류입니다. API 키와 시크릿, 시스템 시간을 점검하세요.",
-    "5300": "Nonce 값이 너무 낮습니다. 서버 시간과 시스템 시간 차이를 확인하세요.",
+    "5300": "API 키가 잘못되었거나 Nonce가 중복되었습니다. 키·시크릿·권한과 시스템 시간을 다시 확인하세요.",
     "5400": "허용되지 않은 IP입니다. API 키에 등록된 IP를 확인하세요.",
     "5500": "해당 API 키에 필요한 권한이 없습니다.",
     "5600": "API 키가 비활성화되었습니다.",
+}
+
+MESSAGE_HINTS: Dict[str, str] = {
+    "invalid apikey": "API 키 또는 시크릿이 올바른지, 주문 권한과 IP 화이트리스트가 맞는지 확인하세요.",
+    "invalid api key": "API 키 또는 시크릿이 올바른지, 주문 권한과 IP 화이트리스트가 맞는지 확인하세요.",
+    "invalid signature": "시그니처가 맞는지, 시크릿과 요청 본문·nonce 생성 방식을 다시 확인하세요.",
+    "nonce is too low": "Nonce가 중복되었습니다. 시스템 시간을 NTP로 동기화하고 동시에 여러 주문을 보내지 않았는지 확인하세요.",
 }
 
 
@@ -166,6 +173,21 @@ class BithumbExchange(Exchange):
         *,
         rest: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, object]:
+        if self.config.bithumb.auth_mode != "jwt":
+            if not self.config.bithumb.api_key or not self.config.bithumb.api_secret:
+                return {
+                    "status": "CONFIG_ERROR",
+                    "message": "Bithumb API 키나 시크릿이 비어 있습니다.",
+                    "hint": "Home Assistant 애드온 설정 또는 config/bot_config.yaml에 API 키와 시크릿을 입력했는지 확인하세요.",
+                }
+        else:
+            if not self.config.bithumb.api_key:
+                return {
+                    "status": "CONFIG_ERROR",
+                    "message": "Bithumb JWT 토큰이 설정되지 않았습니다.",
+                    "hint": "애드온 설정의 BITHUMB_API_KEY 자리에 발급받은 JWT를 입력하세요.",
+                }
+
         legacy_variant = self._build_legacy_variant(endpoint, params)
         rest_variant = self._build_rest_variant(rest) if rest else None
         order: List[Dict[str, Any]] = []
@@ -261,6 +283,18 @@ class BithumbExchange(Exchange):
         if remote_status in ERROR_HINTS and "hint" not in payload:
             payload = dict(payload)
             payload["hint"] = ERROR_HINTS[remote_status]
+        if "hint" not in payload:
+            message = str(payload.get("remote_message") or payload.get("message") or "").lower()
+            for needle, hint in MESSAGE_HINTS.items():
+                if needle in message:
+                    payload = dict(payload)
+                    payload["hint"] = hint
+                    break
+        if "hint" not in payload:
+            http_status = payload.get("http_status")
+            if http_status in (404, 405):
+                payload = dict(payload)
+                payload["hint"] = "REST 엔드포인트 경로나 베이스 URL을 확인하세요. Bithumb 2.x 문서와 동일한지 비교해 주세요."
         history = payload.get("failover_history")
         if isinstance(history, list):
             enriched: List[Dict[str, object]] = []
