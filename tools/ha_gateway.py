@@ -49,7 +49,7 @@ def _metrics_path(config: BotConfig) -> Path:
 def _report_path(config: BotConfig) -> Path:
     path = Path(config.home_assistant.reporting.output_path)
     if not path.is_absolute():
-        path = Path.cwd() / path
+        path = DATA_DIR / path
     return path
 
 

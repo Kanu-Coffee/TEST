@@ -66,11 +66,6 @@ class BithumbExchange(Exchange):
         self._session.headers.update({"User-Agent": "grid-bot/1.0"})
         self._last_clock_warning = 0.0
 
-        # None / 미설정 / 기타 값 -> 기본 legacy 로 취급
-        mode = getattr(self.config.bithumb, "auth_mode", "legacy") or "legacy"
-        self._auth_mode = mode.lower()
-        self._use_legacy = self._auth_mode != "jwt"
-
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
@@ -127,36 +122,6 @@ class BithumbExchange(Exchange):
             payload = dict(payload)
             payload["hint"] = ERROR_HINTS[status]
         return payload
-
-    # ---------- v2.1.x JWT 서명 ---------------------------------------
-    def _jwt_headers(self, params: Optional[Dict[str, Any]] = None) -> Dict[str, str]:
-        """
-        v2.1.x Private API용 JWT Authorization 헤더 생성.
-        - access_key: API 키
-        - nonce: uuid4
-        - timestamp: ms
-        - query_hash / query_hash_alg: 파라미터 있는 경우 SHA512(query_string)
-        """
-        cred = self.config.bithumb
-        payload: Dict[str, Any] = {
-            "access_key": cred.api_key,
-            "nonce": str(uuid.uuid4()),
-            "timestamp": int(time.time() * 1000),
-        }
-
-        if params:
-            # Bithumb 가이드 예시와 동일하게 query string 생성 후 SHA512 적용.
-            query = urlencode(params, doseq=True).encode("utf-8")
-            h = hashlib.sha512()
-            h.update(query)
-            payload["query_hash"] = h.hexdigest()
-            payload["query_hash_alg"] = "SHA512"
-
-        token = _encode_jwt_hs256(payload, cred.api_secret)
-        return {
-            "Authorization": f"Bearer {token}",
-            "Content-Type": "application/json; charset=utf-8",
-        }
 
     # ---------- 공통 유틸 ----------------------------------------------
     def _market_id(self) -> str:

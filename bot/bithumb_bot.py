@@ -18,9 +18,7 @@ from exchanges.base import Exchange, OrderResult, Quote
 
 from .config import BotConfig, StrategyParams
 from .home_assistant import HomeAssistantPublisher
-
-DATA_DIR = Path(__file__).resolve().parent.parent / "data"
-DATA_DIR.mkdir(parents=True, exist_ok=True)
+from .paths import DATA_DIR
 
 
 # -----------------------------------------------------------------------------
