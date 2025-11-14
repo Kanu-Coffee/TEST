@@ -1,4 +1,4 @@
-"""Bithumb REST exchange adapter."""
+"""Bithumb REST exchange adapter (v1.2.0 legacy + v2.1.x JWT)."""
 from __future__ import annotations
 
 import base64
@@ -33,6 +33,11 @@ MESSAGE_HINTS: Dict[str, str] = {
     "nonce is too low": "Nonce가 중복되었습니다. 시스템 시간을 NTP로 동기화하고 동시에 여러 주문을 보내지 않았는지 확인하세요.",
 }
 class BithumbExchange(Exchange):
+    """
+    - auth_mode == 'legacy' (기본값): v1.2.0 HMAC (기존 /public, /trade, /info 엔드포인트)
+    - auth_mode == 'jwt'         : v2.1.x JWT  ( /v1/ticker, /v1/orders, /v1/order 등)
+    """
+
     def __init__(self, config: BotConfig) -> None:
         super().__init__(config)
         self._session = requests.Session()
@@ -428,11 +433,11 @@ class BithumbExchange(Exchange):
         if not isinstance(payload, dict) or str(payload.get("status")) != "0000":
             return []
         rows: List[OpenOrder] = []
-        for row in payload.get("data") or []:
+        for row in data:
             rows.append(
                 OpenOrder(
-                    order_id=str(row.get("order_id")),
-                    side="buy" if str(row.get("type", "bid")).lower() == "bid" else "sell",
+                    order_id=str(row.get("uuid")),
+                    side="buy" if str(row.get("side", "bid")).lower() == "bid" else "sell",
                 )
             )
         return rows
@@ -441,12 +446,15 @@ class BithumbExchange(Exchange):
     # Normalisation helpers
     # ------------------------------------------------------------------
     def round_price(self, price: float) -> float:
+        # KRW 마켓 기준: 1원 단위 절사 (필요하면 나중에 호가단위 로직 붙일 수 있음)
         return float(int(round(price)))
 
     def round_quantity(self, quantity: float) -> float:
+        # BTC/USDT 등 소수 8자리까지 허용
         return round(quantity, 8)
 
     def min_notional(self) -> float:
+        # 최소 주문 금액 (KRW 기준). 필요시 config로 뺄 수 있음.
         return 5000.0
 
     def _rest_symbol(self) -> str:

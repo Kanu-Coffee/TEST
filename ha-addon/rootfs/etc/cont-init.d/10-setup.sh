@@ -1,9 +1,14 @@
 #!/command/with-contenv bashio
-# Pre-patch for HAOS pip path issue
-ln -sf /usr/bin/pip3 /usr/bin/pip 2>/dev/null || true
-export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PATH:-}"
 set -euo pipefail
 
+# --------------------------------------------------------------------
+# 공통 PATH 설정 (s6 init path bug workaround)
+# --------------------------------------------------------------------
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PATH:-}"
+
+# --------------------------------------------------------------------
+# 애드온 옵션 로딩
+# --------------------------------------------------------------------
 REPO_URL="$(bashio::config 'repository_url')"
 REPO_REF="$(bashio::config 'repository_ref')"
 EXCHANGE="$(bashio::config 'exchange' | tr '[:lower:]' '[:upper:]')"
@@ -19,6 +24,12 @@ DEFAULT_MARTINGALE="$(bashio::config 'default_martingale_mul')"
 DEFAULT_STEPS="$(bashio::config 'default_max_steps')"
 HF_BASE="$(bashio::config 'hf_base_order_value')"
 HF_STEP="$(bashio::config 'hf_buy_step')"
+
+# Timezone 설정 (봇용 + 컨테이너용)
+BOT_TZ="$(bashio::config 'bot_timezone' 'Asia/Seoul')"
+SYS_TZ="$(bashio::config 'tz' "${BOT_TZ}")"
+export TZ="${SYS_TZ}"
+
 HF_MARTINGALE="$(bashio::config 'hf_martingale_mul')"
 HF_STEPS="$(bashio::config 'hf_max_steps')"
 BITHUMB_API_KEY="$(bashio::config 'bithumb_api_key')"
@@ -38,7 +49,9 @@ ENABLE_LOG_GATEWAY="$(bashio::config 'enable_log_gateway')"
 TRADE_LOG_PORT="$(bashio::config 'trade_log_port')"
 ERROR_LOG_PORT="$(bashio::config 'error_log_port')"
 
+# --------------------------------------------------------------------
 # sensible defaults
+# --------------------------------------------------------------------
 SYMBOL=${SYMBOL:-USDT_KRW}
 ORDER_CCY=${ORDER_CCY:-USDT}
 PAY_CCY=${PAY_CCY:-KRW}
@@ -67,7 +80,9 @@ export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PATH
 
 bashio::log.info "Preparing trading bot workspace"
 
-# clone or update repo
+# --------------------------------------------------------------------
+# Git repo 준비 (clone or update)
+# --------------------------------------------------------------------
 if [ -d "/opt/bot/.git" ]; then
     bashio::log.info "Updating existing repository in /opt/bot"
     git -C /opt/bot remote set-url origin "${REPO_URL}"
@@ -80,21 +95,25 @@ fi
 git -C /opt/bot checkout "${REPO_REF}"
 git -C /opt/bot submodule update --init --recursive
 
-# detect python runtime
+# --------------------------------------------------------------------
+# Python runtime 탐지
+# --------------------------------------------------------------------
 PYTHON_BIN="$(command -v python3 || command -v python || true)"
 if [[ -z "${PYTHON_BIN}" ]]; then
     bashio::log.fatal "Python runtime not found in the container"
     exit 1
 fi
 
-# ---------- pip dependency installation (PEP 668-aware) ----------
+# --------------------------------------------------------------------
+# pip dependency 설치 (PEP 668-aware, 최초 1회만 pip 업그레이드)
+# --------------------------------------------------------------------
 if [ -f /opt/bot/requirements.txt ]; then
     bashio::log.info "Installing Python dependencies"
 
-    # Allow pip to modify the system environment (PEP 668 override)
+    # system env 설치 허용 (PEP 668 override)
     export PIP_BREAK_SYSTEM_PACKAGES=1
 
-    # determine usable pip command, prefer module invocation
+    # pip 명령어 결정 (모듈 방식 우선)
     PIP_CMD=()
     if "${PYTHON_BIN}" -m pip --version >/dev/null 2>&1; then
         PIP_CMD=("${PYTHON_BIN}" -m pip)
@@ -110,26 +129,35 @@ if [ -f /opt/bot/requirements.txt ]; then
         exit 1
     fi
 
-    # ensure /usr/bin/pip symlink for any later scripts
+    # HAOS pip path issue용 심링크 (한 번만)
     if ! command -v pip >/dev/null 2>&1 && command -v pip3 >/dev/null 2>&1; then
         ln -sf "$(command -v pip3)" /usr/bin/pip || true
     fi
 
-    # upgrade pip (best-effort, don't kill container if this fails)
-    if ! "${PIP_CMD[@]}" install --no-cache-dir --upgrade pip --break-system-packages; then
-        bashio::log.warning "pip upgrade failed, continuing with existing version"
+    # pip 업그레이드는 최초 1회만 수행하여 부팅시간 단축
+    PIP_UPGRADE_FLAG="/data/bot/.pip_upgraded"
+    if [ ! -f "${PIP_UPGRADE_FLAG}" ]; then
+        if ! "${PIP_CMD[@]}" install --upgrade pip --break-system-packages; then
+            bashio::log.warning "pip upgrade failed, continuing with existing version"
+        else
+            touch "${PIP_UPGRADE_FLAG}"
+        fi
+    else
+        bashio::log.info "pip already upgraded previously, skipping upgrade step"
     fi
 
-    # install requirements
-    "${PIP_CMD[@]}" install --no-cache-dir --break-system-packages -r /opt/bot/requirements.txt
+    # requirements 설치
+    #  - --no-cache-dir 제거: 이미 설치된 패키지는 캐시 및 기존 설치를 활용해 빠르게 종료
+    "${PIP_CMD[@]}" install --break-system-packages -r /opt/bot/requirements.txt
 fi
-# ---------------------------------------------------------------
 
+# --------------------------------------------------------------------
+# Dry-run 및 키 검증
+# --------------------------------------------------------------------
 if bashio::var.true "${DRY_RUN}"; then
     bashio::log.notice "Dry-run mode is enabled. No live orders will be sent."
 fi
 
-# exchange key validation
 if [[ "${EXCHANGE}" == "BITHUMB" ]]; then
     if [[ -z "${BITHUMB_API_KEY}" || -z "${BITHUMB_API_SECRET}" ]]; then
         if bashio::var.true "${DRY_RUN}"; then
@@ -150,10 +178,13 @@ elif [[ "${EXCHANGE}" == "KIS" ]]; then
     fi
 fi
 
-# generate .env
+# --------------------------------------------------------------------
+# .env 생성
+# --------------------------------------------------------------------
 mkdir -p /data/bot
 mkdir -p /config/bithumb-bot
 ENV_FILE="/data/bot/.env"
+
 {
     printf 'EXCHANGE=%s\n' "${EXCHANGE}"
     printf 'BOT_SYMBOL_TICKER=%s\n' "${SYMBOL}"
@@ -186,6 +217,9 @@ ENV_FILE="/data/bot/.env"
     printf 'BOT_DATA_DIR=%s\n' "/config/bithumb-bot"
 } > "${ENV_FILE}"
 
+# --------------------------------------------------------------------
+# Gateway 제어용 런타임 파일
+# --------------------------------------------------------------------
 echo "ENABLE_GATEWAY=${ENABLE_GATEWAY}" > /var/run/ha_bot_enable_gateway
 echo "${GATEWAY_PORT}" > /var/run/ha_bot_gateway_port
 echo "ENABLE_LOG_GATEWAY=${ENABLE_LOG_GATEWAY}" > /var/run/ha_bot_enable_log_gateway
