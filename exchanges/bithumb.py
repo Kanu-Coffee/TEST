@@ -123,14 +123,6 @@ class BithumbExchange(Exchange):
             payload["hint"] = ERROR_HINTS[status]
         return payload
 
-    # ---------- 공통 유틸 ----------------------------------------------
-    def _market_id(self) -> str:
-        """
-        v2.1.x 마켓 ID 포맷: KRW-BTC, KRW-USDT 등 (payment-order).
-        기존 config.bot.symbol_ticker (e.g. USDT_KRW)는 v1.2.0용으로 그대로 유지.
-        """
-        return f"{self.config.bot.payment_currency}-{self.config.bot.order_currency}"
-
     # ------------------------------------------------------------------
     # Exchange interface
     # ------------------------------------------------------------------

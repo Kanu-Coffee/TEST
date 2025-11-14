@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Dict, List
 
 from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
+from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, Response
 
 from bot.config import BotConfig
 from bot.logs import TradeLogger
@@ -94,7 +94,10 @@ async def error_health() -> Dict[str, str]:
 
 
 @error_app.get("/errors")
-async def errors(limit: int = Query(200, ge=1, le=2000), format: str = Query("json")) -> JSONResponse | PlainTextResponse:
+async def errors(
+    limit: int = Query(200, ge=1, le=2000),
+    format: str = Query("json"),
+) -> Response:
     logger = _load_logger()
     rows = _load_errors(logger.paths.error_log, limit)
     if format.lower() == "text":
