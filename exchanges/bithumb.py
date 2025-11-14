@@ -32,35 +32,6 @@ MESSAGE_HINTS: Dict[str, str] = {
     "invalid signature": "시그니처가 맞는지, 시크릿과 요청 본문·nonce 생성 방식을 다시 확인하세요.",
     "nonce is too low": "Nonce가 중복되었습니다. 시스템 시간을 NTP로 동기화하고 동시에 여러 주문을 보내지 않았는지 확인하세요.",
 }
-
-
-def _now_ms() -> str:
-    return str(int(time.time() * 1000))
-
-
-def _b64url(data: bytes) -> str:
-    """Minimal base64url encoder without padding (for HS256 JWT)."""
-    return base64.urlsafe_b64encode(data).rstrip(b"=").decode("ascii")
-
-
-def _encode_jwt_hs256(payload: Dict[str, Any], secret: str) -> str:
-    """
-    Minimal HS256 JWT 구현 (pyjwt 미의존).
-    Bithumb v2.1.x 가이드의 HS256 서명 방식과 동일한 포맷을 따른다.
-    """
-    header = {"alg": "HS256", "typ": "JWT"}
-    header_bytes = json.dumps(header, separators=(",", ":"), sort_keys=True).encode("utf-8")
-    payload_bytes = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
-
-    header_b64 = _b64url(header_bytes)
-    payload_b64 = _b64url(payload_bytes)
-    signing_input = f"{header_b64}.{payload_b64}".encode("ascii")
-
-    signature = hmac.new(secret.encode("utf-8"), signing_input, hashlib.sha256).digest()
-    sig_b64 = _b64url(signature)
-    return f"{header_b64}.{payload_b64}.{sig_b64}"
-
-
 class BithumbExchange(Exchange):
     """
     - auth_mode == 'legacy' (기본값): v1.2.0 HMAC (기존 /public, /trade, /info 엔드포인트)
@@ -72,6 +43,7 @@ class BithumbExchange(Exchange):
         self._session = requests.Session()
         self._session.headers.update({"User-Agent": "grid-bot/1.0"})
         self._last_clock_warning = 0.0
+        self._last_nonce = 0
 
     # ------------------------------------------------------------------
     # Helpers
@@ -82,6 +54,13 @@ class BithumbExchange(Exchange):
     def _rest_base_url(self) -> str:
         base = self.config.bithumb.rest_base_url or self.config.bithumb.base_url
         return base.rstrip("/")
+
+    def _next_nonce(self) -> str:
+        now = int(time.time() * 1000)
+        if now <= self._last_nonce:
+            now = self._last_nonce + 1
+        self._last_nonce = now
+        return str(now)
 
     def _signed_headers(self, endpoint: str, body: str, *, content_type: Optional[str] = None) -> Dict[str, str]:
         cred = self.config.bithumb
@@ -95,9 +74,9 @@ class BithumbExchange(Exchange):
             )
             return headers
 
-        nonce = _now_ms()
+        nonce = self._next_nonce()
         payload = f"{endpoint}\x00{body}\x00{nonce}".encode("utf-8")
-        digest = hmac.new(cred.api_secret.encode("utf-8"), payload, hashlib.sha512).digest()
+        digest = hmac.new(cred.api_secret.encode("utf-8"), payload, hashlib.sha512).hexdigest().encode("utf-8")
         signature = base64.b64encode(digest).decode("utf-8")
         headers.update(
             {
