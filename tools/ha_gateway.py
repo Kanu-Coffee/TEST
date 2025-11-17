@@ -49,7 +49,7 @@ def _metrics_path(config: BotConfig) -> Path:
 def _report_path(config: BotConfig) -> Path:
     path = Path(config.home_assistant.reporting.output_path)
     if not path.is_absolute():
-        path = Path.cwd() / path
+        path = DATA_DIR / path
     return path
 
 
@@ -172,6 +172,10 @@ async def index() -> HTMLResponse:
                     <label>HF Mode (true/false)
                         <input name="BOT_HF_MODE" value="{str(cfg.bot.hf_mode).lower()}" />
                     </label>
+                    <label>Use Market Orders (true/false)
+                        <input name="BOT_USE_MARKET_ORDERS" value="{str(cfg.bot.use_market_orders).lower()}" />
+                        <span class="note">true로 설정하면 트리거 시 시장가 주문을 사용합니다.</span>
+                    </label>
                 </div>
             </fieldset>
             <fieldset>
@@ -243,6 +247,7 @@ async def update_config(
     BOT_PAYMENT_CURRENCY: str = Form(...),
     BOT_DRY_RUN: str = Form(...),
     BOT_HF_MODE: str = Form(...),
+    BOT_USE_MARKET_ORDERS: str = Form(...),
     ACTIVE_BASE_ORDER_VALUE: str = Form(...),
     ACTIVE_BUY_STEP: str = Form(...),
     ACTIVE_MARTINGALE: str = Form(...),
@@ -265,6 +270,7 @@ async def update_config(
             "BOT_PAYMENT_CURRENCY": BOT_PAYMENT_CURRENCY.strip(),
             "BOT_DRY_RUN": BOT_DRY_RUN.strip().lower(),
             "BOT_HF_MODE": BOT_HF_MODE.strip().lower(),
+            "BOT_USE_MARKET_ORDERS": BOT_USE_MARKET_ORDERS.strip().lower(),
             "BITHUMB_API_KEY": BITHUMB_API_KEY.strip(),
             "BITHUMB_API_SECRET": BITHUMB_API_SECRET.strip(),
             "KIS_APP_KEY": KIS_APP_KEY.strip(),

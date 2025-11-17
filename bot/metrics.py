@@ -2,14 +2,12 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from typing import Any, Callable, Dict, Optional
 
-from .config import BotConfig, HomeAssistantSettings, ROOT_DIR
+from .config import BotConfig, HomeAssistantSettings
+from .paths import DATA_DIR
 
 ErrorHandler = Optional[Callable[[str], None]]
-DATA_DIR = ROOT_DIR / "data"
-DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 
 class MetricsPublisher:

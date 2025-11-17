@@ -12,6 +12,7 @@ ORDER_CCY="$(bashio::config 'bot_order_currency')"
 PAY_CCY="$(bashio::config 'bot_payment_currency')"
 DRY_RUN="$(bashio::config 'bot_dry_run')"
 HF_MODE="$(bashio::config 'bot_hf_mode')"
+BASE_RESET_MINUTES="$(bashio::config 'base_reset_minutes')"
 DEFAULT_BASE="$(bashio::config 'default_base_order_value')"
 DEFAULT_STEP="$(bashio::config 'default_buy_step')"
 DEFAULT_MARTINGALE="$(bashio::config 'default_martingale_mul')"
@@ -33,6 +34,9 @@ KIS_CURRENCY="$(bashio::config 'kis_currency')"
 KIS_ORDER_LOT_SIZE="$(bashio::config 'kis_order_lot_size')"
 ENABLE_GATEWAY="$(bashio::config 'enable_gateway')"
 GATEWAY_PORT="$(bashio::config 'gateway_port')"
+ENABLE_LOG_GATEWAY="$(bashio::config 'enable_log_gateway')"
+TRADE_LOG_PORT="$(bashio::config 'trade_log_port')"
+ERROR_LOG_PORT="$(bashio::config 'error_log_port')"
 
 # sensible defaults
 SYMBOL=${SYMBOL:-USDT_KRW}
@@ -40,6 +44,7 @@ ORDER_CCY=${ORDER_CCY:-USDT}
 PAY_CCY=${PAY_CCY:-KRW}
 DRY_RUN=${DRY_RUN:-true}
 HF_MODE=${HF_MODE:-true}
+BASE_RESET_MINUTES=${BASE_RESET_MINUTES:-15}
 DEFAULT_BASE=${DEFAULT_BASE:-5000}
 DEFAULT_STEP=${DEFAULT_STEP:-0.008}
 DEFAULT_MARTINGALE=${DEFAULT_MARTINGALE:-1.5}
@@ -54,6 +59,8 @@ KIS_SYMBOL=${KIS_SYMBOL:-TQQQ}
 KIS_CURRENCY=${KIS_CURRENCY:-USD}
 KIS_ORDER_LOT_SIZE=${KIS_ORDER_LOT_SIZE:-1.0}
 GATEWAY_PORT=${GATEWAY_PORT:-6443}
+TRADE_LOG_PORT=${TRADE_LOG_PORT:-6442}
+ERROR_LOG_PORT=${ERROR_LOG_PORT:-6441}
 
 # ensure PATH covers all base locations (s6 init path bug workaround)
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PATH:-}"
@@ -145,6 +152,7 @@ fi
 
 # generate .env
 mkdir -p /data/bot
+mkdir -p /config/bithumb-bot
 ENV_FILE="/data/bot/.env"
 {
     printf 'EXCHANGE=%s\n' "${EXCHANGE}"
@@ -153,6 +161,7 @@ ENV_FILE="/data/bot/.env"
     printf 'BOT_PAYMENT_CURRENCY=%s\n' "${PAY_CCY}"
     printf 'BOT_DRY_RUN=%s\n' "${DRY_RUN}"
     printf 'BOT_HF_MODE=%s\n' "${HF_MODE}"
+    printf 'BASE_RESET_MINUTES=%s\n' "${BASE_RESET_MINUTES}"
     printf 'DEFAULT_BASE_ORDER_VALUE=%s\n' "${DEFAULT_BASE}"
     printf 'DEFAULT_BASE_KRW=%s\n' "${DEFAULT_BASE}"
     printf 'DEFAULT_BUY_STEP=%s\n' "${DEFAULT_STEP}"
@@ -174,9 +183,13 @@ ENV_FILE="/data/bot/.env"
     printf 'KIS_SYMBOL=%s\n' "${KIS_SYMBOL}"
     printf 'KIS_CURRENCY=%s\n' "${KIS_CURRENCY}"
     printf 'KIS_ORDER_LOT_SIZE=%s\n' "${KIS_ORDER_LOT_SIZE}"
+    printf 'BOT_DATA_DIR=%s\n' "/config/bithumb-bot"
 } > "${ENV_FILE}"
 
 echo "ENABLE_GATEWAY=${ENABLE_GATEWAY}" > /var/run/ha_bot_enable_gateway
 echo "${GATEWAY_PORT}" > /var/run/ha_bot_gateway_port
+echo "ENABLE_LOG_GATEWAY=${ENABLE_LOG_GATEWAY}" > /var/run/ha_bot_enable_log_gateway
+echo "${TRADE_LOG_PORT}" > /var/run/ha_bot_trade_port
+echo "${ERROR_LOG_PORT}" > /var/run/ha_bot_error_port
 
 bashio::log.info "Environment prepared"
