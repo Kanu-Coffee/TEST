@@ -17,6 +17,11 @@ def run_bot(config: BotConfig | None = None) -> None:
         f"🚀 Starting grid bot | exchange={cfg.bot.exchange} "
         f"symbol={cfg.bot.symbol_ticker} hf_mode={cfg.bot.hf_mode} dry_run={cfg.bot.dry_run}"
     )
+    
+    # 🔧 Bithumb 거래소 시간 동기화 (Home Assistant 환경 대응)
+    if cfg.bot.exchange.upper() == "BITHUMB":
+        print("⏰ Syncing Bithumb server time...")
+        strategy.exchange._sync_server_time()
 
     strategy.run_forever()
 
