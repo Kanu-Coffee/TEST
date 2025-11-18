@@ -120,10 +120,10 @@ class BithumbSettings:
     api_key: str = ""
     api_secret: str = ""
     base_url: str = "https://api.bithumb.com"
-    rest_base_url: str = "https://global-openapi.bithumb.com"
-    rest_place_endpoint: str = "/api/v2/spot/trade/place"
-    rest_market_buy_endpoint: str = "/api/v2/spot/trade/market_buy"
-    rest_market_sell_endpoint: str = "/api/v2/spot/trade/market_sell"
+    rest_base_url: str = ""
+    rest_place_endpoint: str = "/v1/orders"
+    rest_market_buy_endpoint: str = "/v1/orders"
+    rest_market_sell_endpoint: str = "/v1/orders"
     prefer_rest: bool = False
     enable_failover: bool = True
     rest_symbol_dash: bool = True
@@ -417,31 +417,28 @@ class BotConfig:
                 _select(
                     source_env,
                     ["BITHUMB_REST_BASE_URL"],
-                    bithumb_section.get(
-                        "rest_base_url",
-                        bithumb_section.get("base_url", "https://global-openapi.bithumb.com"),
-                    ),
+                    bithumb_section.get("rest_base_url", ""),
                 )
             ).strip(),
             rest_place_endpoint=str(
                 _select(
                     source_env,
                     ["BITHUMB_REST_PLACE_ENDPOINT"],
-                    bithumb_section.get("rest_place_endpoint", "/api/v2/spot/trade/place"),
+                    bithumb_section.get("rest_place_endpoint", "/v1/orders"),
                 )
             ).strip(),
             rest_market_buy_endpoint=str(
                 _select(
                     source_env,
                     ["BITHUMB_REST_MARKET_BUY"],
-                    bithumb_section.get("rest_market_buy_endpoint", "/api/v2/spot/trade/market_buy"),
+                    bithumb_section.get("rest_market_buy_endpoint", "/v1/orders"),
                 )
             ).strip(),
             rest_market_sell_endpoint=str(
                 _select(
                     source_env,
                     ["BITHUMB_REST_MARKET_SELL"],
-                    bithumb_section.get("rest_market_sell_endpoint", "/api/v2/spot/trade/market_sell"),
+                    bithumb_section.get("rest_market_sell_endpoint", "/v1/orders"),
                 )
             ).strip(),
             prefer_rest=_as_bool(_select(source_env, ["BITHUMB_PREFER_REST"], bithumb_section.get("prefer_rest", False)), False),
@@ -456,11 +453,11 @@ class BotConfig:
         if not bithumb.rest_base_url:
             bithumb.rest_base_url = bithumb.base_url
         if not bithumb.rest_place_endpoint:
-            bithumb.rest_place_endpoint = "/api/v2/spot/trade/place"
+            bithumb.rest_place_endpoint = "/v1/orders"
         if not bithumb.rest_market_buy_endpoint:
-            bithumb.rest_market_buy_endpoint = "/api/v2/spot/trade/market_buy"
+            bithumb.rest_market_buy_endpoint = "/v1/orders"
         if not bithumb.rest_market_sell_endpoint:
-            bithumb.rest_market_sell_endpoint = "/api/v2/spot/trade/market_sell"
+            bithumb.rest_market_sell_endpoint = "/v1/orders"
 
         kis = KisSettings(
             app_key=str(_select(source_env, ["KIS_APP_KEY"], kis_section.get("app_key", ""))),

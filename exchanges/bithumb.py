@@ -71,6 +71,7 @@ class BithumbExchange(Exchange):
         content_type: Optional[str] = None,
         signature_style: str = "hex",
         signature_payload: str = "endpoint_body_nonce",
+        hash_source: Optional[str] = None,
     ) -> Dict[str, str]:
         cred = self.config.bithumb
         headers: Dict[str, str] = {"Api-Client-Type": "2"}
@@ -78,7 +79,7 @@ class BithumbExchange(Exchange):
         if auth_mode == "jwt":
             headers.update(
                 self._jwt_headers(
-                    body=body,
+                    hash_source=hash_source or body,
                     content_type=content_type or "application/json",
                 )
             )
@@ -107,12 +108,12 @@ class BithumbExchange(Exchange):
         )
         return headers
 
-    def _jwt_headers(self, *, body: str, content_type: str) -> Dict[str, str]:
+    def _jwt_headers(self, *, hash_source: str, content_type: str) -> Dict[str, str]:
         cred = self.config.bithumb
         if not cred.api_key or not cred.api_secret:
             raise ValueError("Bithumb JWT mode requires api_key and api_secret")
-        body_bytes = body.encode("utf-8") if body else b""
-        query_hash = hashlib.sha512(body_bytes).hexdigest()
+        hash_bytes = hash_source.encode("utf-8") if hash_source else b""
+        query_hash = hashlib.sha512(hash_bytes).hexdigest()
         payload = {
             "access_key": cred.api_key,
             "nonce": str(uuid.uuid4()),
@@ -159,6 +160,7 @@ class BithumbExchange(Exchange):
         content_type: str,
         signature_style: str = "digest",
         signature_payload: str = "endpoint_body_nonce",
+        hash_source: Optional[str] = None,
         **_: Any,
     ) -> Tuple[bool, Dict[str, object]]:
         headers = self._signed_headers(
@@ -167,6 +169,7 @@ class BithumbExchange(Exchange):
             content_type=content_type,
             signature_style=signature_style,
             signature_payload=signature_payload,
+            hash_source=hash_source,
         )
         request_kwargs: Dict[str, Any] = {
             "url": url,
@@ -298,6 +301,8 @@ class BithumbExchange(Exchange):
         if not endpoint:
             return None
         params = dict(rest.get("params") or {})
+        # Query hash는 문서 예시처럼 URL 인코딩 문자열 기준으로 계산한다.
+        query_source = urlencode(params or {}, doseq=True)
         body = json.dumps(params, ensure_ascii=False, separators=(",", ":"))
         data = body
         json_payload: Optional[Dict[str, Any]] = None
@@ -310,6 +315,7 @@ class BithumbExchange(Exchange):
             "json_payload": json_payload,
             "content_type": "application/json",
             "signature_style": "digest",
+            "hash_source": query_source,
         }
 
     def _normalise_payload(self, payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -417,17 +423,24 @@ class BithumbExchange(Exchange):
 
         rest_payload: Optional[Dict[str, Any]] = None
         if self.config.bithumb.rest_place_endpoint:
+            rest_market = self._rest_symbol()
+            rest_side = "bid" if is_buy else "ask"
+            rest_ord_type = "limit"
+            rest_price_value: Optional[str] = None
+            if self.config.bot.use_market_orders:
+                if is_buy:
+                    rest_ord_type = "price"
+                    rest_price_value = str(int(round(price * quantity)))
+                else:
+                    rest_ord_type = "market"
+            else:
+                rest_price_value = str(int(round(price)))
             rest_params = {
-                "symbol": self._rest_symbol(),
-                "side": "BUY" if is_buy else "SELL",
-                "type": "market" if self.config.bot.use_market_orders else "limit",
-                "order_type": "market" if self.config.bot.use_market_orders else "limit",
-                "price": str(int(round(price))) if not self.config.bot.use_market_orders else None,
-                "quantity": f"{quantity:.8f}",
-                "units": f"{quantity:.8f}",
+                "market": rest_market,
+                "side": rest_side,
                 "volume": f"{quantity:.8f}",
-                "order_currency": self.config.bot.order_currency,
-                "payment_currency": self.config.bot.payment_currency,
+                "price": rest_price_value,
+                "ord_type": rest_ord_type,
             }
             rest_params = {k: v for k, v in rest_params.items() if v is not None}
             rest_endpoint = (
@@ -504,6 +517,9 @@ class BithumbExchange(Exchange):
 
     def _rest_symbol(self) -> str:
         symbol = self.config.bot.symbol_ticker
+        expected = f"{self.config.bot.order_currency}_{self.config.bot.payment_currency}"
+        if symbol.upper() == expected.upper():
+            symbol = f"{self.config.bot.payment_currency}_{self.config.bot.order_currency}"
         if self.config.bithumb.rest_symbol_dash:
             symbol = symbol.replace("_", "-")
         if self.config.bithumb.rest_symbol_upper:

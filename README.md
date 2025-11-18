@@ -149,6 +149,8 @@ http://<HA_LOCAL_IP>:6443/
   - `bithumb.prefer_rest`: `true` → REST 우선, `false` → 레거시 우선
   - `bithumb.enable_failover`: `true` 면 실패 시 다른 버전으로 자동 재시도
   - `bithumb.rest_symbol_dash/rest_symbol_upper`: 심볼 표기 형태 조정
+  - 기본 REST 주문 경로는 `/v1/orders` 한 개로 통일되어 빗썸 JWT 샘플과 동일한 `market/side/volume/ord_type` 파라미터를 사용합니다.
+  - `auth_mode: jwt`일 때는 빗썸 공식 문서처럼 `urlencode(params)` 문자열을 SHA512 해시하여 JWT `query_hash`를 계산합니다.
 
 자세한 설명은 `docs/USER_GUIDE.md` 를 참고하세요.
 

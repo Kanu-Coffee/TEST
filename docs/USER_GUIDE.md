@@ -114,10 +114,10 @@ bithumb:
   api_key: ""
   api_secret: ""
   base_url: https://api.bithumb.com
-  rest_base_url: https://global-openapi.bithumb.com
-  rest_place_endpoint: /api/v2/spot/trade/place
-  rest_market_buy_endpoint: /api/v2/spot/trade/market_buy
-  rest_market_sell_endpoint: /api/v2/spot/trade/market_sell
+  rest_base_url: https://api.bithumb.com   # 비우면 base_url 사용
+  rest_place_endpoint: /v1/orders
+  rest_market_buy_endpoint: /v1/orders
+  rest_market_sell_endpoint: /v1/orders
   prefer_rest: false
   enable_failover: true
   rest_symbol_dash: true
@@ -135,8 +135,10 @@ bithumb:
   - `true` 일 때 첫 번째 경로가 4xx/5xx 로 실패하면 다른 버전으로 자동 재시도
 - `rest_*_endpoint`
   - 빗썸 API 문서(https://apidocs.bithumb.com/) 기준 엔드포인트를 원하는 버전으로 교체 가능
+  - 기본값은 `/v1/orders` 한 개로 통일되어 limit/market 모두 처리합니다.
 - `rest_symbol_dash`, `rest_symbol_upper`
   - v2.1 심볼 포맷이 `BTC-KRW` 처럼 하이픈/대문자를 요구할 때 조정
+- `auth_mode: jwt`일 때 JWT 페이로드는 빗썸 샘플처럼 `urlencode(params)` 결과를 SHA512 해시하여 `query_hash` 필드에 넣습니다.
 - 주문 시그니처는 공식 문서처럼 **HMAC-SHA512 → Base64**(바이너리 다이제스트) 순으로 계산합니다.
   봇이 millisecond nonce 를 자동 생성하지만, 동일 ms 내 다중 주문을 위해
   시스템 시간이 역행하지 않도록 NTP 동기화를 유지해 주세요.

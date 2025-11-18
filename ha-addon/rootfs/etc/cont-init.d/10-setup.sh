@@ -92,9 +92,23 @@ fi
 
 bashio::log.info "Preparing trading bot workspace"
 
-# --------------------------------------------------------------------
-# Git repo 준비 (clone or update)
-# --------------------------------------------------------------------
+# Ensure git is available (base 이미지를 재활용해도 안전하게 설치)
+if ! command -v git >/dev/null 2>&1; then
+    if command -v apk >/dev/null 2>&1; then
+        bashio::log.warning "git not found, installing via apk"
+        apk add --no-cache git || true
+    elif command -v apt-get >/dev/null 2>&1; then
+        bashio::log.warning "git not found, installing via apt-get"
+        apt-get update && apt-get install -y git && apt-get clean && rm -rf /var/lib/apt/lists/* || true
+    fi
+fi
+
+if ! command -v git >/dev/null 2>&1; then
+    bashio::log.fatal "git command not available even after attempted installation"
+    exit 1
+fi
+
+# clone or update repo
 if [ -d "/opt/bot/.git" ]; then
     bashio::log.info "Updating existing repository in /opt/bot"
     git -C /opt/bot remote set-url origin "${REPO_URL}"
