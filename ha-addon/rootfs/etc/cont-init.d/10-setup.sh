@@ -121,10 +121,20 @@ fi
 git -C /opt/bot checkout "${REPO_REF}"
 git -C /opt/bot submodule update --init --recursive
 
-# --------------------------------------------------------------------
-# Python runtime 탐지
-# --------------------------------------------------------------------
+# detect/install python runtime
 PYTHON_BIN="$(command -v python3 || command -v python || true)"
+if [[ -z "${PYTHON_BIN}" ]]; then
+    bashio::log.warning "Python runtime not found, attempting to install"
+    if command -v apk >/dev/null 2>&1; then
+        apk add --no-cache python3 py3-pip || true
+    elif command -v apt-get >/dev/null 2>&1; then
+        apt-get update && apt-get install -y python3 python3-venv python3-pip && apt-get clean && rm -rf /var/lib/apt/lists/* || true
+    else
+        bashio::log.warning "No supported package manager detected for automatic Python installation"
+    fi
+    PYTHON_BIN="$(command -v python3 || command -v python || true)"
+fi
+
 if [[ -z "${PYTHON_BIN}" ]]; then
     bashio::log.fatal "Python runtime not found in the container"
     exit 1
