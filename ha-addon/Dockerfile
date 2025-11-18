@@ -9,9 +9,12 @@ ENV PIP_NO_CACHE_DIR=1 \
 # 필요한 추가 패키지만 설치
 # base-python 이미지 안에 이미 python3 는 들어있지만,
 # 필요하다면 py3-pip 만 별도로 설치해도 됨.
+# ⏰ NTP 시간 동기화 관련 패키지 포함
 RUN apk add --no-cache \
     git \
     py3-pip \
+    ntpd \
+    chrony \
  && ln -sf /usr/bin/pip3 /usr/bin/pip || true
 
 WORKDIR /opt/bot
