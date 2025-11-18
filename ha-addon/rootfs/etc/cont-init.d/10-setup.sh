@@ -12,6 +12,7 @@ ORDER_CCY="$(bashio::config 'bot_order_currency')"
 PAY_CCY="$(bashio::config 'bot_payment_currency')"
 DRY_RUN="$(bashio::config 'bot_dry_run')"
 HF_MODE="$(bashio::config 'bot_hf_mode')"
+BASE_RESET_MINUTES="$(bashio::config 'base_reset_minutes')"
 DEFAULT_BASE="$(bashio::config 'default_base_order_value')"
 DEFAULT_STEP="$(bashio::config 'default_buy_step')"
 DEFAULT_MARTINGALE="$(bashio::config 'default_martingale_mul')"
@@ -33,6 +34,9 @@ KIS_CURRENCY="$(bashio::config 'kis_currency')"
 KIS_ORDER_LOT_SIZE="$(bashio::config 'kis_order_lot_size')"
 ENABLE_GATEWAY="$(bashio::config 'enable_gateway')"
 GATEWAY_PORT="$(bashio::config 'gateway_port')"
+ENABLE_LOG_GATEWAY="$(bashio::config 'enable_log_gateway')"
+TRADE_LOG_PORT="$(bashio::config 'trade_log_port')"
+ERROR_LOG_PORT="$(bashio::config 'error_log_port')"
 
 # sensible defaults
 SYMBOL=${SYMBOL:-USDT_KRW}
@@ -40,6 +44,7 @@ ORDER_CCY=${ORDER_CCY:-USDT}
 PAY_CCY=${PAY_CCY:-KRW}
 DRY_RUN=${DRY_RUN:-true}
 HF_MODE=${HF_MODE:-true}
+BASE_RESET_MINUTES=${BASE_RESET_MINUTES:-15}
 DEFAULT_BASE=${DEFAULT_BASE:-5000}
 DEFAULT_STEP=${DEFAULT_STEP:-0.008}
 DEFAULT_MARTINGALE=${DEFAULT_MARTINGALE:-1.5}
@@ -54,11 +59,29 @@ KIS_SYMBOL=${KIS_SYMBOL:-TQQQ}
 KIS_CURRENCY=${KIS_CURRENCY:-USD}
 KIS_ORDER_LOT_SIZE=${KIS_ORDER_LOT_SIZE:-1.0}
 GATEWAY_PORT=${GATEWAY_PORT:-6443}
+TRADE_LOG_PORT=${TRADE_LOG_PORT:-6442}
+ERROR_LOG_PORT=${ERROR_LOG_PORT:-6441}
 
 # ensure PATH covers all base locations (s6 init path bug workaround)
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PATH:-}"
 
 bashio::log.info "Preparing trading bot workspace"
+
+# Ensure git is available (base 이미지를 재활용해도 안전하게 설치)
+if ! command -v git >/dev/null 2>&1; then
+    if command -v apk >/dev/null 2>&1; then
+        bashio::log.warning "git not found, installing via apk"
+        apk add --no-cache git || true
+    elif command -v apt-get >/dev/null 2>&1; then
+        bashio::log.warning "git not found, installing via apt-get"
+        apt-get update && apt-get install -y git && apt-get clean && rm -rf /var/lib/apt/lists/* || true
+    fi
+fi
+
+if ! command -v git >/dev/null 2>&1; then
+    bashio::log.fatal "git command not available even after attempted installation"
+    exit 1
+fi
 
 # clone or update repo
 if [ -d "/opt/bot/.git" ]; then
@@ -73,8 +96,20 @@ fi
 git -C /opt/bot checkout "${REPO_REF}"
 git -C /opt/bot submodule update --init --recursive
 
-# detect python runtime
+# detect/install python runtime
 PYTHON_BIN="$(command -v python3 || command -v python || true)"
+if [[ -z "${PYTHON_BIN}" ]]; then
+    bashio::log.warning "Python runtime not found, attempting to install"
+    if command -v apk >/dev/null 2>&1; then
+        apk add --no-cache python3 py3-pip || true
+    elif command -v apt-get >/dev/null 2>&1; then
+        apt-get update && apt-get install -y python3 python3-venv python3-pip && apt-get clean && rm -rf /var/lib/apt/lists/* || true
+    else
+        bashio::log.warning "No supported package manager detected for automatic Python installation"
+    fi
+    PYTHON_BIN="$(command -v python3 || command -v python || true)"
+fi
+
 if [[ -z "${PYTHON_BIN}" ]]; then
     bashio::log.fatal "Python runtime not found in the container"
     exit 1
@@ -145,6 +180,7 @@ fi
 
 # generate .env
 mkdir -p /data/bot
+mkdir -p /config/bithumb-bot
 ENV_FILE="/data/bot/.env"
 {
     printf 'EXCHANGE=%s\n' "${EXCHANGE}"
@@ -153,6 +189,7 @@ ENV_FILE="/data/bot/.env"
     printf 'BOT_PAYMENT_CURRENCY=%s\n' "${PAY_CCY}"
     printf 'BOT_DRY_RUN=%s\n' "${DRY_RUN}"
     printf 'BOT_HF_MODE=%s\n' "${HF_MODE}"
+    printf 'BASE_RESET_MINUTES=%s\n' "${BASE_RESET_MINUTES}"
     printf 'DEFAULT_BASE_ORDER_VALUE=%s\n' "${DEFAULT_BASE}"
     printf 'DEFAULT_BASE_KRW=%s\n' "${DEFAULT_BASE}"
     printf 'DEFAULT_BUY_STEP=%s\n' "${DEFAULT_STEP}"
@@ -174,9 +211,13 @@ ENV_FILE="/data/bot/.env"
     printf 'KIS_SYMBOL=%s\n' "${KIS_SYMBOL}"
     printf 'KIS_CURRENCY=%s\n' "${KIS_CURRENCY}"
     printf 'KIS_ORDER_LOT_SIZE=%s\n' "${KIS_ORDER_LOT_SIZE}"
+    printf 'BOT_DATA_DIR=%s\n' "/config/bithumb-bot"
 } > "${ENV_FILE}"
 
 echo "ENABLE_GATEWAY=${ENABLE_GATEWAY}" > /var/run/ha_bot_enable_gateway
 echo "${GATEWAY_PORT}" > /var/run/ha_bot_gateway_port
+echo "ENABLE_LOG_GATEWAY=${ENABLE_LOG_GATEWAY}" > /var/run/ha_bot_enable_log_gateway
+echo "${TRADE_LOG_PORT}" > /var/run/ha_bot_trade_port
+echo "${ERROR_LOG_PORT}" > /var/run/ha_bot_error_port
 
 bashio::log.info "Environment prepared"
