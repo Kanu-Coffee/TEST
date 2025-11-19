@@ -56,5 +56,14 @@ if [ -f /var/run/ha_bot_enable_log_gateway ] && grep -qi "true" /var/run/ha_bot_
     start_uvicorn_app "tools.log_gateway:error_app" "${ERROR_PORT}" "error log gateway"
 fi
 
+if [ -f /var/run/ha_bot_enable_log_gateway ] && grep -qi "true" /var/run/ha_bot_enable_log_gateway; then
+    TRADE_PORT="$(cat /var/run/ha_bot_trade_port 2>/dev/null || echo 6442)"
+    ERROR_PORT="$(cat /var/run/ha_bot_error_port 2>/dev/null || echo 6441)"
+    bashio::log.info "Starting trade log gateway on port ${TRADE_PORT}"
+    python3 -m uvicorn tools.log_gateway:trade_app --host 0.0.0.0 --port "${TRADE_PORT}" --workers 1 --log-level info &
+    bashio::log.info "Starting error log gateway on port ${ERROR_PORT}"
+    python3 -m uvicorn tools.log_gateway:error_app --host 0.0.0.0 --port "${ERROR_PORT}" --workers 1 --log-level info &
+fi
+
 bashio::log.info "Starting trading bot"
 exec python3 -m bot
