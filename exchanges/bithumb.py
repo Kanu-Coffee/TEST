@@ -127,6 +127,45 @@ class BithumbExchange(Exchange):
             "Content-Type": content_type,
         }
 
+    def _sync_server_time(self) -> None:
+        """Align the nonce floor with the latest server timestamp."""
+
+        url = f"{self._base_url()}/public/ticker/{self.config.bot.symbol_ticker}"
+        try:
+            resp = self._session.get(url, timeout=5)
+            resp.raise_for_status()
+            payload = resp.json()
+        except Exception as exc:  # pragma: no cover - defensive
+            print(f"⚠️ Failed to fetch Bithumb server time: {exc}")
+            return
+
+        server_ms = 0
+        data = payload.get("data") if isinstance(payload, dict) else None
+        if isinstance(data, dict):
+            try:
+                server_ms = int(float(data.get("date") or 0))
+            except (TypeError, ValueError):
+                server_ms = 0
+        if not server_ms and isinstance(payload, dict):
+            try:
+                server_ms = int(float(payload.get("date") or 0))
+            except (TypeError, ValueError):
+                server_ms = 0
+
+        if not server_ms:
+            print("⚠️ Bithumb server time was missing in the ticker response; skipping sync.")
+            return
+
+        local_ms = int(time.time() * 1000)
+        drift_ms = server_ms - local_ms
+        self._last_nonce = max(self._last_nonce, server_ms)
+
+        if abs(drift_ms) > 1000:
+            print(
+                "⏱️ Bithumb server and system clocks differ by "
+                f"{drift_ms / 1000.0:.3f}s. Nonce floor adjusted to server time."
+            )
+
     def _format_http_error(self, exc: requests.HTTPError) -> Dict[str, object]:
         payload: Dict[str, object] = {"status": "HTTP_ERROR", "message": str(exc)}
         resp = exc.response

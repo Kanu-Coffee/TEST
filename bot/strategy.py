@@ -69,6 +69,14 @@ class GridStrategy:
         self.exchange: Exchange = get_exchange(config.bot.exchange)(config)
         self.state = StrategyState()
 
+        sync_fn = getattr(self.exchange, "_sync_server_time", None)
+        if callable(sync_fn):
+            try:
+                print(f"⏰ Syncing {self.config.bot.exchange} server time...")
+                sync_fn()
+            except Exception as exc:  # pragma: no cover - defensive
+                self.logger.log_error(f"서버 시간 동기화 실패: {exc}")
+
         self.order_times: Deque[float] = deque(maxlen=100)
         self.last_order_ts = 0.0
         self.pending_orders: Dict[str, Dict[str, float]] = {}

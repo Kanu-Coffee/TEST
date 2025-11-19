@@ -86,5 +86,18 @@ class Exchange:
         epsilon = max(1e-6, self.min_notional() * 1e-6)
         return quantity > 0 and notional + epsilon >= self.min_notional()
 
+    # ------------------------------------------------------------------
+    # Clock helpers
+    # ------------------------------------------------------------------
+    def _sync_server_time(self) -> None:
+        """Optional hook for exchanges that require clock alignment.
+
+        The default implementation is a no-op so that strategy code can call
+        ``exchange._sync_server_time()`` unconditionally without having to
+        special-case each adapter.
+        """
+
+        return None
+
 
 __all__ = ["Exchange", "Quote", "OrderResult", "OpenOrder"]

@@ -142,6 +142,8 @@ bithumb:
 - 주문 시그니처는 공식 문서처럼 **HMAC-SHA512 → Base64**(바이너리 다이제스트) 순으로 계산합니다.
   봇이 millisecond nonce 를 자동 생성하지만, 동일 ms 내 다중 주문을 위해
   시스템 시간이 역행하지 않도록 NTP 동기화를 유지해 주세요.
+- 봇이 시작될 때 `/public/ticker/{symbol}` 응답의 `date` 값을 읽어 nonce 기준값을 서버 시각에 맞춥니다.
+  로그에 `⏱️` 메시지가 표시되면 시스템 시계와의 차이를 줄이거나 NTP를 다시 동기화해 주세요.
 
 #### 4.2.2 KIS (한국투자증권)
 
@@ -365,6 +367,7 @@ python -m bot.runner
    - `repository_url`, `repository_ref` (일반적으로 기본값 유지)
    - `exchange`, `bot_symbol_ticker`, 전략 파라미터, API 키 등 입력
    - `enable_gateway` 를 `true` 로 하면 `http://HA_IP:6443` 에서 웹 UI 접근 가능
+   - `enable_log_gateway` 가 `true` 이면 6442/6441 포트를 자동으로 검사한 뒤 비어 있을 때만 서비스가 시작됩니다.
 5. 애드온 시작 후 로그에서:
    - `Environment prepared`
    - `Starting trading bot`

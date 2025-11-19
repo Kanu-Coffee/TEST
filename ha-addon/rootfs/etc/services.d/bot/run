@@ -1,6 +1,38 @@
 #!/command/with-contenv bashio
 set -euo pipefail
 
+check_port_free() {
+    local port="$1"
+    if python3 - "$port" <<'PY'
+import socket
+import sys
+
+port = int(sys.argv[1])
+sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+try:
+    sock.bind(("0.0.0.0", port))
+except OSError:
+    sys.exit(1)
+finally:
+    sock.close()
+PY
+    then
+        return 0
+    fi
+    return 1
+}
+
+start_uvicorn_app() {
+    local app="$1"
+    local port="$2"
+    local label="$3"
+    if ! check_port_free "$port"; then
+        bashio::log.warning "Port ${port} already in use. Skipping ${label}."
+        return 0
+    fi
+    python3 -m uvicorn "$app" --host 0.0.0.0 --port "$port" --workers 1 --log-level info &
+}
+
 cd /opt/bot
 
 if [ -f /data/bot/.env ]; then
@@ -12,7 +44,16 @@ fi
 if [ -f /var/run/ha_bot_enable_gateway ] && grep -qi "true" /var/run/ha_bot_enable_gateway; then
     PORT="$(cat /var/run/ha_bot_gateway_port 2>/dev/null || echo 6443)"
     bashio::log.info "Starting Home Assistant gateway on port ${PORT}"
-    python3 -m uvicorn tools.ha_gateway:app --host 0.0.0.0 --port "${PORT}" --workers 1 --log-level info &
+    start_uvicorn_app "tools.ha_gateway:app" "${PORT}" "Home Assistant gateway"
+fi
+
+if [ -f /var/run/ha_bot_enable_log_gateway ] && grep -qi "true" /var/run/ha_bot_enable_log_gateway; then
+    TRADE_PORT="$(cat /var/run/ha_bot_trade_port 2>/dev/null || echo 6442)"
+    ERROR_PORT="$(cat /var/run/ha_bot_error_port 2>/dev/null || echo 6441)"
+    bashio::log.info "Starting trade log gateway on port ${TRADE_PORT}"
+    start_uvicorn_app "tools.log_gateway:trade_app" "${TRADE_PORT}" "trade log gateway"
+    bashio::log.info "Starting error log gateway on port ${ERROR_PORT}"
+    start_uvicorn_app "tools.log_gateway:error_app" "${ERROR_PORT}" "error log gateway"
 fi
 
 if [ -f /var/run/ha_bot_enable_log_gateway ] && grep -qi "true" /var/run/ha_bot_enable_log_gateway; then

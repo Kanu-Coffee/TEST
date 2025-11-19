@@ -24,8 +24,10 @@
   - HA 대시보드에서 가격, 포지션, PnL 등 모니터링
 - 🧪 **Dry-run 모드**
   - 실제 주문 없이 전략 검증 가능
+- 🕒 **Server Time Alignment**
+  - Bithumb 어댑터가 부팅 시 거래소 시각을 읽어와 nonce 기준선을 맞춰 5300 오류(Nonce too low)를 예방
 
-> ⚠️ **DISCLAIMER**  
+> ⚠️ **DISCLAIMER**
 > 이 저장소는 개인 연구/실험 목적입니다.  
 > 실제 자금 운용 전 **충분한 테스트와 리스크 검토**를 반드시 수행하세요.  
 > 모든 책임은 사용자에게 있습니다.
@@ -100,6 +102,7 @@ python -m bot.runner
 3. `Bithumb/KIS Trading Bot` 애드온 설치 후:
    - 옵션에서 거래소, 심볼, API 키, 전략 파라미터 입력
    - 필요 시 `enable_gateway: true` 로 설정 (포트 6443)
+   - `enable_log_gateway: true` 인 경우 6442/6441 포트 충돌 여부를 자동으로 검사하고, 이미 사용 중이면 경고만 남기고 건너뜁니다.
 4. 애드온 시작 후 로그에서:
    - `Environment prepared`
    - `Starting trading bot`
